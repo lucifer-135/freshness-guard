@@ -4,6 +4,15 @@
     "openai": {
       "keys": [{ "name": "fake", "value": "test-key", "models": ["*"], "weight": 1.0 }],
       "network_config": { "base_url": "http://fakeprovider:9000", "allow_private_network": true }
+    },
+    "groq": {
+      "keys": [{ "name": "groq", "value": "env.GROQ_API_KEY", "models": ["*"], "weight": 1.0 }]
+    },
+    "gemini": {
+      "keys": [{ "name": "gemini", "value": "env.GEMINI_API_KEY", "models": ["*"], "weight": 1.0 }]
+    },
+    "openrouter": {
+      "keys": [{ "name": "openrouter", "value": "env.OPENROUTER_API_KEY", "models": ["*"], "weight": 1.0 }]
     }
   },
   "plugins": [
@@ -11,7 +20,16 @@
       "enabled": true,
       "name": "freshness-guard",
       "path": "/app/plugins/freshness-guard.so",
-      "config": { "api": { "port": 8090, "token": "env.FG_API_TOKEN" } }
+      "placement": "pre_builtin",
+      "config": {
+        "api": { "port": 8090, "token": "env.FG_API_TOKEN" },
+        "tavily_api_key": "env.TAVILY_API_KEY",
+        "models": { "extract": "groq/openai/gpt-oss-20b", "judge": "groq/openai/gpt-oss-120b" },
+        "fallbacks": { "extract": ["gemini/gemini-3.5-flash-lite"], "judge": ["gemini/gemini-3.5-flash"] },
+        "model_cutoffs": { "groq/openai/gpt-oss-20b": "2024-06", "groq/openai/gpt-oss-120b": "2024-06" },
+        "daily_credit_budget": 30,
+        "db_path": "/app/data/freshness.db"
+      }
     }
   ]
 }
