@@ -23,6 +23,8 @@ func TestAuthority(t *testing.T) {
 		{"https://cloudflare.com", "Example Cloud", 0.5},
 		{"https://someblog.dev/p", "GitHub Copilot", 0.5},
 		{"https://notreuters.com/a", "", 0.5},
+		{"https://anyone.github.io/x", "GitHub", 0.5},
+		{"https://cloud.someblog.com", "Example Cloud", 0.5},
 		{"::bad", "x", 0.5},
 	}
 	for _, tc := range cases {

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/lucifer-135/freshness-guard/internal/engine"
 )
@@ -92,4 +93,18 @@ func TestBudgetIsSafeForConcurrentUse(t *testing.T) {
 	}
 	wg.Wait()
 	assert.Equal(t, 50, spent)
+}
+
+func TestBudgetRefund(t *testing.T) {
+	store := &fakeCreditStore{}
+	c := &clock{time.Date(2026, 11, 3, 10, 0, 0, 0, time.UTC)}
+	b := engine.NewBudget(store, 3, c.now, slog.Default())
+	require.True(t, b.TrySpend(1))
+	require.True(t, b.TrySpend(1))
+	b.Refund(1)
+	assert.Equal(t, 1, b.Used())
+	assert.True(t, b.TrySpend(2))
+	b.Refund(10)
+	assert.Equal(t, 0, b.Used())
+	assert.Contains(t, store.calls, creditCall{"2026-11-03", -1, 3})
 }

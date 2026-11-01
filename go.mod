@@ -8,6 +8,7 @@ require (
 	github.com/maximhq/bifrost/core v1.14.1
 	github.com/sergi/go-diff v1.4.0
 	github.com/stretchr/testify v1.12.1
+	golang.org/x/net v0.61.0
 )
 
 require (
@@ -32,7 +33,6 @@ require (
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/arch v0.23.0 // indirect
-	golang.org/x/net v0.61.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
 )

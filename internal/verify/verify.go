@@ -34,9 +34,11 @@ type JSONCompleter interface {
 	CompleteJSON(ctx context.Context, req llm.Request, out any) error
 }
 
-// Spender reserves Tavily credits for escalation searches.
+// Spender reserves Tavily credits for escalation searches and refunds credits
+// reserved for searches that failed.
 type Spender interface {
 	TrySpend(n int) bool
+	Refund(n int)
 }
 
 // Verifier checks claims with Tavily evidence and an LLM judge.
@@ -129,6 +131,10 @@ func (v *Verifier) searchAll(ctx context.Context, claims []report.Claim) (map[in
 	credits := 0
 	for i, o := range outcomes {
 		c := &claims[i]
+		if o.err != nil {
+			// Triage reserved one credit for this search; a failed search costs none.
+			v.refund(1)
+		}
 		switch {
 		case errors.Is(o.err, tavily.ErrCreditLimit):
 			markUnverifiable(c, "The Tavily credit limit has been reached.")
@@ -166,6 +172,7 @@ func (v *Verifier) escalate(ctx context.Context, claims []report.Claim, judged [
 			Query: searchQuery(*c), Topic: TopicFor(c.Category), Depth: "advanced", MaxResults: MaxResults,
 		})
 		if err != nil {
+			v.refund(2)
 			continue
 		}
 		credits += resp.Credits
@@ -185,6 +192,12 @@ func (v *Verifier) escalate(ctx context.Context, claims []report.Claim, judged [
 		escalated = append(escalated, i)
 	}
 	return escalated, credits
+}
+
+func (v *Verifier) refund(n int) {
+	if v.Budget != nil {
+		v.Budget.Refund(n)
+	}
 }
 
 func searchQuery(c report.Claim) string {

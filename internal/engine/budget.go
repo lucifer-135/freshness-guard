@@ -64,6 +64,22 @@ func (b *Budget) TrySpend(n int) bool {
 	return true
 }
 
+// Refund returns n credits that were reserved for a search that did not
+// happen or failed. Today's usage never goes below zero.
+func (b *Budget) Refund(n int) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.roll()
+	n = min(n, b.used)
+	if n <= 0 {
+		return
+	}
+	b.used -= n
+	if err := b.store.AddCredits(context.Background(), b.day, -n, b.daily); err != nil {
+		b.logger.Error("The Tavily credit ledger could not be updated.", "error", err)
+	}
+}
+
 // Used returns the credits used today.
 func (b *Budget) Used() int {
 	b.mu.Lock()

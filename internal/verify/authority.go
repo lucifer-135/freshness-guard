@@ -5,6 +5,8 @@ import (
 	"strings"
 	"unicode"
 
+	"golang.org/x/net/publicsuffix"
+
 	"github.com/lucifer-135/freshness-guard/internal/report"
 )
 
@@ -36,18 +38,22 @@ func Authority(rawURL, entity string) float64 {
 		}
 	}
 
+	// The entity's own site is recognized by its registrable domain only, so a
+	// subdomain such as anyone.github.io does not count as GitHub's site.
+	registrable, err := publicsuffix.EffectiveTLDPlusOne(host)
+	if err != nil {
+		return 0.5
+	}
+	label, _, _ := strings.Cut(registrable, ".")
 	words := strings.FieldsFunc(strings.ToLower(entity), func(r rune) bool {
 		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
 	})
-	joined := strings.Join(words, "")
-	for _, l := range labels[:len(labels)-1] {
-		if joined != "" && l == joined {
+	if joined := strings.Join(words, ""); joined != "" && label == joined {
+		return 1
+	}
+	for _, w := range words {
+		if len(w) >= 4 && label == w {
 			return 1
-		}
-		for _, w := range words {
-			if len(w) >= 4 && l == w {
-				return 1
-			}
 		}
 	}
 	return 0.5

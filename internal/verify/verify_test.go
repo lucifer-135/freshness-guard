@@ -29,10 +29,11 @@ func date(y int, m time.Month, d int) *time.Time {
 type searchKey struct{ depth, query string }
 
 type fakeSearcher struct {
-	mu        sync.Mutex
-	responses map[searchKey]tavily.SearchResponse
-	errs      map[string]error
-	requests  []tavily.SearchRequest
+	mu          sync.Mutex
+	responses   map[searchKey]tavily.SearchResponse
+	errs        map[string]error // by query, for every depth
+	advancedErr error            // for advanced searches only
+	requests    []tavily.SearchRequest
 }
 
 func (f *fakeSearcher) Search(_ context.Context, req tavily.SearchRequest) (tavily.SearchResponse, error) {
@@ -41,6 +42,9 @@ func (f *fakeSearcher) Search(_ context.Context, req tavily.SearchRequest) (tavi
 	f.requests = append(f.requests, req)
 	if err := f.errs[req.Query]; err != nil {
 		return tavily.SearchResponse{}, err
+	}
+	if req.Depth == "advanced" && f.advancedErr != nil {
+		return tavily.SearchResponse{}, f.advancedErr
 	}
 	return f.responses[searchKey{req.Depth, req.Query}], nil
 }
@@ -67,9 +71,12 @@ func (f *fakeCompleter) CompleteJSON(_ context.Context, req llm.Request, out any
 }
 
 type fakeSpender struct {
-	allow bool
-	calls []int
+	allow   bool
+	calls   []int
+	refunds []int
 }
+
+func (f *fakeSpender) Refund(n int) { f.refunds = append(f.refunds, n) }
 
 func (f *fakeSpender) TrySpend(n int) bool {
 	f.calls = append(f.calls, n)
@@ -363,4 +370,30 @@ func TestConflictRuleDowngradesFresh(t *testing.T) {
 	stale := conflictClaim(1.0, date(2026, 6, 1))
 	stale.Verdict = report.VerdictStale
 	assert.Equal(t, report.VerdictStale, verify.ApplyConflictRule(stale).Verdict)
+}
+
+func TestVerifyRefundsFailedSearch(t *testing.T) {
+	s := &fakeSearcher{responses: basicResponses(), errs: map[string]error{"price q": errors.New("timeout")}}
+	b := &fakeSpender{}
+	_, _, err := newVerifier(s, &fakeCompleter{replies: []string{judgeBoth}}, b).Verify(context.Background(), testClaims())
+	require.NoError(t, err)
+	assert.Equal(t, []int{1}, b.refunds)
+}
+
+func TestVerifyRefundsFailedEscalation(t *testing.T) {
+	s := &fakeSearcher{responses: escalationResponses(), advancedErr: errors.New("timeout")}
+	b := &fakeSpender{allow: true}
+	_, _, err := newVerifier(s, &fakeCompleter{replies: []string{firstUnverifiable}}, b).Verify(context.Background(), testClaims())
+	require.NoError(t, err)
+	assert.Equal(t, []int{2}, b.refunds)
+}
+
+func TestVerifyDoesNotRefundEmptyResults(t *testing.T) {
+	responses := basicResponses()
+	responses[searchKey{"basic", "price q"}] = tavily.SearchResponse{Credits: 1}
+	b := &fakeSpender{}
+	_, _, err := newVerifier(&fakeSearcher{responses: responses}, &fakeCompleter{replies: []string{judgeBoth}}, b).
+		Verify(context.Background(), testClaims())
+	require.NoError(t, err)
+	assert.Empty(t, b.refunds)
 }
