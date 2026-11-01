@@ -46,6 +46,8 @@ type Deps struct {
 	Logger       *slog.Logger
 	Events       Events
 	Heartbeat    time.Duration
+	Gateway      Gateway
+	Credits      Credits
 }
 
 type handler struct {
@@ -76,6 +78,9 @@ func NewHandler(deps Deps) http.Handler {
 	mux.Handle("GET /freshness/reports", protect(http.HandlerFunc(h.listReports)))
 	mux.Handle("POST /freshness/check", protect(http.HandlerFunc(h.check)))
 	mux.Handle("GET /freshness/events", protect(http.HandlerFunc(h.events)))
+	mux.Handle("POST /freshness/chat", protect(http.HandlerFunc(h.chat)))
+	mux.Handle("GET /freshness/models", protect(http.HandlerFunc(h.models)))
+	mux.Handle("GET /freshness/status", protect(http.HandlerFunc(h.status)))
 	return mux
 }
 
