@@ -177,3 +177,65 @@ func TestParseReadsAllFields(t *testing.T) {
 	assert.Equal(t, 0, cfg.DailyCreditBudget)
 	assert.Equal(t, "/tmp/f.db", cfg.DBPath)
 }
+
+func TestDefaultsForStrictMode(t *testing.T) {
+	d := config.Default()
+	assert.Equal(t, "heal", d.DefaultPolicy)
+	assert.Equal(t, 8*time.Second, d.SyncTimeout)
+	assert.Equal(t, 0.7, d.BlockConfidence)
+	assert.False(t, d.FailClosed)
+	assert.Equal(t, "groq/openai/gpt-oss-120b", d.HealModel)
+	assert.Equal(t, []string{"gemini/gemini-3.5-flash"}, d.HealFallbacks)
+	assert.Equal(t, "http://127.0.0.1:8080", d.BifrostBaseURL)
+}
+
+func TestDefaultBifrostBaseURLFollowsPort(t *testing.T) {
+	assert.Equal(t, "http://127.0.0.1:9000", config.DefaultBifrostBaseURL([]string{"x", "-port", "9000"}))
+	assert.Equal(t, "http://127.0.0.1:8080", config.DefaultBifrostBaseURL(nil))
+}
+
+func TestParseStrictModeFields(t *testing.T) {
+	cfg, w := config.Parse(map[string]any{
+		"default_policy": "block", "sync_timeout_ms": 3000.0, "block_confidence": 0.9, "fail_closed": true,
+		"models": map[string]any{"heal": "a/h"}, "fallbacks": map[string]any{"heal": []any{}},
+	})
+	assert.Empty(t, w)
+	assert.Equal(t, "block", cfg.DefaultPolicy)
+	assert.Equal(t, 3*time.Second, cfg.SyncTimeout)
+	assert.Equal(t, 0.9, cfg.BlockConfidence)
+	assert.True(t, cfg.FailClosed)
+	assert.Equal(t, "a/h", cfg.HealModel)
+	assert.Empty(t, cfg.HealFallbacks)
+}
+
+func TestParseRejectsBadStrictModeValues(t *testing.T) {
+	d := config.Default()
+	cases := []struct {
+		key   string
+		value any
+		check func(config.Config) bool
+	}{
+		{"default_policy", "fix", func(c config.Config) bool { return c.DefaultPolicy == d.DefaultPolicy }},
+		{"sync_timeout_ms", 500.0, func(c config.Config) bool { return c.SyncTimeout == d.SyncTimeout }},
+		{"block_confidence", 0.0, func(c config.Config) bool { return c.BlockConfidence == d.BlockConfidence }},
+		{"fail_closed", "yes", func(c config.Config) bool { return c.FailClosed == d.FailClosed }},
+	}
+	for _, tc := range cases {
+		t.Run(tc.key, func(t *testing.T) {
+			cfg, w := config.Parse(map[string]any{tc.key: tc.value})
+			assert.True(t, tc.check(cfg))
+			require.Len(t, w, 1)
+			assert.Contains(t, w[0], tc.key)
+		})
+	}
+}
+
+func TestParseVirtualKeyPolicy(t *testing.T) {
+	cfg, w := config.Parse(map[string]any{"virtual_keys": map[string]any{
+		"vk-a": map[string]any{"mode": "sync", "policy": "block"},
+		"vk-b": map[string]any{"mode": "sync", "policy": "fix"},
+	}})
+	assert.Equal(t, config.VirtualKey{Mode: "sync", SampleRate: 1, Policy: "block"}, cfg.VirtualKeys["vk-a"])
+	assert.NotContains(t, cfg.VirtualKeys, "vk-b")
+	assert.Len(t, w, 1)
+}

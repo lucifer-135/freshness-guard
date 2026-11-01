@@ -19,6 +19,8 @@ const (
 type VirtualKey struct {
 	Mode       string
 	SampleRate float64
+	// Policy is empty when the key uses DefaultPolicy.
+	Policy string
 }
 
 // Config is the validated plugin configuration.
@@ -31,10 +33,18 @@ type Config struct {
 
 	TavilyAPIKey, TavilyBaseURL string
 
-	DefaultMode string
+	DefaultMode   string
+	DefaultPolicy string
 
-	ExtractModel, JudgeModel         string
-	ExtractFallbacks, JudgeFallbacks []string
+	// Synchronous mode waits at most SyncTimeout for verification. The block
+	// policy blocks claims judged STALE or WRONG with at least BlockConfidence;
+	// without a complete result it blocks only when FailClosed is set.
+	SyncTimeout     time.Duration
+	BlockConfidence float64
+	FailClosed      bool
+
+	ExtractModel, JudgeModel, HealModel             string
+	ExtractFallbacks, JudgeFallbacks, HealFallbacks []string
 
 	ModelCutoffs map[string]time.Time
 
@@ -51,13 +61,18 @@ func Default() Config {
 	return Config{
 		APIHost:           "0.0.0.0",
 		APIPort:           defaultAPIPort,
-		BifrostBaseURL:    "http://127.0.0.1:8080",
+		BifrostBaseURL:    DefaultBifrostBaseURL(os.Args),
 		TavilyBaseURL:     "https://api.tavily.com",
 		DefaultMode:       "async",
+		DefaultPolicy:     "heal",
+		SyncTimeout:       8 * time.Second,
+		BlockConfidence:   0.7,
 		ExtractModel:      "groq/openai/gpt-oss-20b",
 		JudgeModel:        "groq/openai/gpt-oss-120b",
+		HealModel:         "groq/openai/gpt-oss-120b",
 		ExtractFallbacks:  []string{"gemini/gemini-3.5-flash-lite"},
 		JudgeFallbacks:    []string{"gemini/gemini-3.5-flash"},
+		HealFallbacks:     []string{"gemini/gemini-3.5-flash"},
 		RiskThreshold:     0.3,
 		MaxClaims:         12,
 		Workers:           4,
@@ -132,6 +147,16 @@ func validMode(m string) bool {
 	return m == "async" || m == "sync" || m == "off"
 }
 
+func validPolicy(p string) bool {
+	return p == "annotate" || p == "heal" || p == "block"
+}
+
+// DefaultBifrostBaseURL returns the address of the Bifrost instance the
+// plugin runs in, on the port read from Bifrost's arguments.
+func DefaultBifrostBaseURL(args []string) string {
+	return fmt.Sprintf("http://127.0.0.1:%d", BifrostPort(args))
+}
+
 // Parse converts the raw plugin config into a Config. It never fails: invalid
 // input falls back to defaults and is reported in the returned warnings.
 func Parse(raw any) (Config, []string) {
@@ -167,15 +192,38 @@ func Parse(raw any) (Config, []string) {
 		}
 	}
 
+	var policy string
+	if decode(p, obj, "", "default_policy", &policy) {
+		if validPolicy(policy) {
+			cfg.DefaultPolicy = policy
+		} else {
+			p.warn("default_policy %q is not annotate, heal or block, so %q is used", policy, cfg.DefaultPolicy)
+		}
+	}
+	syncMS := int(cfg.SyncTimeout / time.Millisecond)
+	p.intRange(obj, "sync_timeout_ms", &syncMS, 1000, 60000)
+	cfg.SyncTimeout = time.Duration(syncMS) * time.Millisecond
+	var blockConfidence float64
+	if decode(p, obj, "", "block_confidence", &blockConfidence) {
+		if blockConfidence > 0 && blockConfidence <= 1 {
+			cfg.BlockConfidence = blockConfidence
+		} else {
+			p.warn("block_confidence %v must be greater than 0 and at most 1, so the default %v is used", blockConfidence, cfg.BlockConfidence)
+		}
+	}
+	decode(p, obj, "", "fail_closed", &cfg.FailClosed)
+
 	var models object
 	if decode(p, obj, "", "models", &models) {
 		p.str(models, "models.", "extract", &cfg.ExtractModel, true)
 		p.str(models, "models.", "judge", &cfg.JudgeModel, true)
+		p.str(models, "models.", "heal", &cfg.HealModel, true)
 	}
 	var fallbacks object
 	if decode(p, obj, "", "fallbacks", &fallbacks) {
 		decode(p, fallbacks, "fallbacks.", "extract", &cfg.ExtractFallbacks)
 		decode(p, fallbacks, "fallbacks.", "judge", &cfg.JudgeFallbacks)
+		decode(p, fallbacks, "fallbacks.", "heal", &cfg.HealFallbacks)
 	}
 
 	var threshold float64
@@ -247,6 +295,7 @@ func (p *parser) parseVirtualKeys(obj object, cfg *Config) {
 		var entry struct {
 			Mode       string   `json:"mode"`
 			SampleRate *float64 `json:"sample_rate"`
+			Policy     string   `json:"policy"`
 		}
 		if err := json.Unmarshal(raw, &entry); err != nil {
 			p.warn("virtual_keys entry %q has the wrong type, so it is ignored: %v", key, err)
@@ -264,7 +313,11 @@ func (p *parser) parseVirtualKeys(obj object, cfg *Config) {
 			p.warn("virtual_keys entry %q has sample_rate %v, which is outside 0-1, so it is ignored", key, rate)
 			continue
 		}
-		cfg.VirtualKeys[key] = VirtualKey{Mode: entry.Mode, SampleRate: rate}
+		if entry.Policy != "" && !validPolicy(entry.Policy) {
+			p.warn("virtual_keys entry %q has policy %q, which is not annotate, heal or block, so it is ignored", key, entry.Policy)
+			continue
+		}
+		cfg.VirtualKeys[key] = VirtualKey{Mode: entry.Mode, SampleRate: rate, Policy: entry.Policy}
 	}
 }
 
