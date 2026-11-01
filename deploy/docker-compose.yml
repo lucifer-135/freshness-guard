@@ -18,7 +18,9 @@ services:
       target: runtime
       additional_contexts:
         bifrost-src: ../.cache/bifrost-src
-    ports: ["8080:8080", "8090:8090"]
+    # Published on localhost only: the dev config.json turns off inference auth,
+    # and .env holds real provider keys.
+    ports: ["127.0.0.1:8080:8080", "127.0.0.1:8090:8090"]
     env_file:
       - path: .env
         required: false
