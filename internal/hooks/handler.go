@@ -35,6 +35,10 @@ type State struct {
 	Failed     bool
 	// Report is the finished report when sync mode received it in time.
 	Report *report.Report
+
+	// streaming requests collect their chunks in buf until the last one.
+	streaming bool
+	buf       strings.Builder
 }
 
 // Submitter queues verification jobs; *engine.Engine implements it.
@@ -123,8 +127,8 @@ func (h *Handler) TransportPre(ctx *schemas.BifrostContext, req *schemas.HTTPReq
 	h.newState(ctx, req.CaseInsensitiveHeaderLookup)
 }
 
-// PreLLM records the prompt and model of a chat request. Streaming and other
-// request types are skipped.
+// PreLLM records the prompt and model of a chat request, streamed or not.
+// Other request types are skipped.
 func (h *Handler) PreLLM(ctx *schemas.BifrostContext, req *schemas.BifrostRequest) {
 	st := StateFrom(ctx)
 	if st == nil {
@@ -136,10 +140,12 @@ func (h *Handler) PreLLM(ctx *schemas.BifrostContext, req *schemas.BifrostReques
 	if st.Mode == ModeOff {
 		return
 	}
-	if req == nil || req.RequestType != schemas.ChatCompletionRequest || req.ChatRequest == nil {
+	if req == nil || req.ChatRequest == nil ||
+		(req.RequestType != schemas.ChatCompletionRequest && req.RequestType != schemas.ChatCompletionStreamRequest) {
 		st.Status = StatusSkipped
 		return
 	}
+	st.streaming = req.RequestType == schemas.ChatCompletionStreamRequest
 	chat := req.ChatRequest
 	st.Provider = string(chat.Provider)
 	st.Model = st.Provider + "/" + chat.Model
@@ -164,6 +170,10 @@ func (h *Handler) PostLLM(ctx *schemas.BifrostContext, resp *schemas.BifrostResp
 	st.mu.Lock()
 	if st.Mode == ModeOff || st.Status != "" {
 		st.mu.Unlock()
+		return resp, nil
+	}
+	if st.streaming {
+		h.collectChunk(ctx, st, resp)
 		return resp, nil
 	}
 	answer := answerText(resp)
@@ -224,6 +234,46 @@ func (h *Handler) PostLLM(ctx *schemas.BifrostContext, resp *schemas.BifrostResp
 	return resp, nil
 }
 
+// collectChunk adds a stream chunk's text to the buffer and, on the last
+// chunk, submits the whole answer. Streams are always checked asynchronously,
+// because their headers are sent before the answer is complete (spec 8.5).
+// The caller holds st.mu; collectChunk releases it.
+func (h *Handler) collectChunk(ctx *schemas.BifrostContext, st *State, resp *schemas.BifrostResponse) {
+	st.buf.WriteString(deltaText(resp))
+	if end, _ := ctx.Value(schemas.BifrostContextKeyStreamEndIndicator).(bool); !end {
+		st.mu.Unlock()
+		return
+	}
+	answer := st.buf.String()
+	st.buf.Reset()
+	st.Status = StatusPending
+	if answer == "" {
+		st.Status = StatusSkipped
+		st.mu.Unlock()
+		return
+	}
+	job := engine.Job{
+		ReportID: st.ReportID, Answer: answer, Prompt: st.Prompt, Model: st.Model, Provider: st.Provider,
+		VirtualKey: st.VirtualKey, Mode: string(ModeAsync), At: h.Now(),
+	}
+	st.mu.Unlock()
+	if _, ok := h.Jobs.Submit(job); !ok {
+		h.setStatus(st, StatusSkipped)
+		h.Logger.Warn("The verification queue is full, so this streamed answer was not checked.", "report", job.ReportID)
+	}
+}
+
+func deltaText(resp *schemas.BifrostResponse) string {
+	if resp == nil || resp.ChatResponse == nil || len(resp.ChatResponse.Choices) == 0 {
+		return ""
+	}
+	choice := resp.ChatResponse.Choices[0]
+	if choice.ChatStreamResponseChoice == nil || choice.Delta == nil || choice.Delta.Content == nil {
+		return ""
+	}
+	return *choice.Delta.Content
+}
+
 // unverified handles a sync request without a complete report: the answer
 // passes, unless the block policy is configured to fail closed.
 func (h *Handler) unverified(resp *schemas.BifrostResponse, mode Mode, policy Policy, id string) (*schemas.BifrostResponse, *schemas.BifrostError) {
@@ -275,7 +325,8 @@ func (h *Handler) ResponseHeaders(ctx *schemas.BifrostContext, resp *schemas.HTT
 	switch {
 	case st.Failed:
 		SetStatusHeader(resp, StatusError)
-	case st.Status == StatusPending:
+	case st.Status == StatusPending, st.streaming && st.Status == "":
+		// Stream headers are sent before the answer ends; the report is announced.
 		SetHeader(resp, HeaderReportID, st.ReportID)
 		SetStatusHeader(resp, StatusPending)
 	case st.Status == StatusComplete && st.Report != nil:

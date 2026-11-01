@@ -117,19 +117,6 @@ func TestQueueFullSetsSkipped(t *testing.T) {
 	assert.Empty(t, md.Header("X-Freshness-Report-Id"))
 }
 
-func TestStreamingIsSkippedInM1(t *testing.T) {
-	jobs := &fakeSubmitter{}
-	h := newHandler(jobs)
-	ctx := newCtx()
-	h.TransportPre(ctx, &schemas.HTTPRequest{})
-	h.PreLLM(ctx, chatRequest(schemas.ChatCompletionStreamRequest))
-	h.PostLLM(ctx, chatResponse(&schemas.ChatMessageContent{ContentStr: str("part")}))
-	md := &schemas.HTTPResponseMetadata{}
-	h.ResponseHeaders(ctx, md)
-	assert.Empty(t, jobs.jobs)
-	assert.Equal(t, "skipped", md.Header("X-Freshness-Status"))
-}
-
 func TestOtherRequestTypesAreSkipped(t *testing.T) {
 	jobs := &fakeSubmitter{}
 	h := newHandler(jobs)
