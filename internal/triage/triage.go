@@ -82,7 +82,8 @@ type Spender interface {
 // descending P(changed) order; each needs P(changed) at or above the current
 // threshold and one credit. The result keeps the input order.
 func Select(claims []report.Claim, base float64, budget Spender) []report.Claim {
-	out := append([]report.Claim(nil), claims...)
+	out := make([]report.Claim, len(claims))
+	copy(out, claims)
 	order := make([]int, 0, len(out))
 	for i, c := range out {
 		if !c.Checked {
