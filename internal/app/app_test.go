@@ -1,6 +1,7 @@
 package app_test
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -79,8 +80,17 @@ func fakeLLM(t *testing.T) *httptest.Server {
 		var body chatBody
 		_ = json.NewDecoder(r.Body).Decode(&body)
 		content := extraction
-		if body.ResponseFormat.JSONSchema.Name == "verdicts" {
-			content = judgeReply(body.Messages[len(body.Messages)-1].Content)
+		user := body.Messages[len(body.Messages)-1].Content
+		switch body.ResponseFormat.JSONSchema.Name {
+		case "verdicts":
+			content = judgeReply(user)
+		case "healed_answer":
+			var in struct {
+				Answer string `json:"answer"`
+			}
+			_ = json.Unmarshal([]byte(user), &in)
+			out, _ := json.Marshal(map[string]string{"text": strings.Replace(in.Answer, "$20", "$25", 1)})
+			content = string(out)
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"choices": []any{map[string]any{"message": map[string]any{"role": "assistant", "content": content}}},
@@ -189,4 +199,83 @@ func TestStartReportsBusyPort(t *testing.T) {
 	require.NoError(t, err)
 	assert.Error(t, a.Start())
 	assert.NoError(t, a.Stop(context.Background()))
+}
+
+func authorized(t *testing.T, method, url, body string) *http.Request {
+	t.Helper()
+	req, err := http.NewRequest(method, url, strings.NewReader(body))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer t")
+	return req
+}
+
+func TestAppStreamsEventsForACheck(t *testing.T) {
+	cfg := testConfig(t)
+	a, err := app.New(cfg, slog.Default())
+	require.NoError(t, err)
+	require.NoError(t, a.Start())
+	defer a.Stop(context.Background())
+	base := fmt.Sprintf("http://127.0.0.1:%d", cfg.APIPort)
+
+	stream, err := http.DefaultClient.Do(authorized(t, http.MethodGet, base+"/freshness/events", ""))
+	require.NoError(t, err)
+	defer stream.Body.Close()
+	lines := bufio.NewReader(stream.Body)
+	first, err := lines.ReadString('\n')
+	require.NoError(t, err)
+	require.Equal(t, ": connected\n", first)
+
+	body, _ := json.Marshal(map[string]string{"text": answer})
+	resp, err := (&http.Client{Timeout: 20 * time.Second}).Do(authorized(t, http.MethodPost, base+"/freshness/check", string(body)))
+	require.NoError(t, err)
+	var rep report.Report
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&rep))
+	resp.Body.Close()
+
+	seen := map[string]int{}
+	deadline := time.After(10 * time.Second)
+	got := make(chan string)
+	go func() {
+		for {
+			line, err := lines.ReadString('\n')
+			if err != nil {
+				close(got)
+				return
+			}
+			got <- line
+		}
+	}()
+	for seen["report.complete"] == 0 {
+		select {
+		case line, ok := <-got:
+			require.True(t, ok, "stream ended early")
+			if typ, found := strings.CutPrefix(strings.TrimSpace(line), "event: "); found {
+				seen[typ]++
+			}
+		case <-deadline:
+			t.Fatalf("no report.complete within 10 seconds; seen %v", seen)
+		}
+	}
+	assert.Equal(t, 1, seen["report.started"])
+	assert.Equal(t, 1, seen["report.claims"])
+	assert.Equal(t, 2, seen["claim.verdict"])
+	assert.NotEmpty(t, rep.ID)
+}
+
+func TestAppStatusReportsCredits(t *testing.T) {
+	cfg := testConfig(t)
+	a, err := app.New(cfg, slog.Default())
+	require.NoError(t, err)
+	require.NoError(t, a.Start())
+	defer a.Stop(context.Background())
+	resp, err := http.DefaultClient.Do(authorized(t, http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/freshness/status", cfg.APIPort), ""))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	var status struct {
+		Credits struct {
+			Budget int `json:"budget"`
+		} `json:"credits"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&status))
+	assert.Equal(t, cfg.DailyCreditBudget, status.Credits.Budget)
 }

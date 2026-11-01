@@ -15,8 +15,11 @@ import (
 	"github.com/lucifer-135/freshness-guard/internal/api"
 	"github.com/lucifer-135/freshness-guard/internal/config"
 	"github.com/lucifer-135/freshness-guard/internal/engine"
+	"github.com/lucifer-135/freshness-guard/internal/events"
 	"github.com/lucifer-135/freshness-guard/internal/extract"
 	"github.com/lucifer-135/freshness-guard/internal/facts"
+	"github.com/lucifer-135/freshness-guard/internal/gateway"
+	"github.com/lucifer-135/freshness-guard/internal/heal"
 	"github.com/lucifer-135/freshness-guard/internal/hooks"
 	"github.com/lucifer-135/freshness-guard/internal/llm"
 	"github.com/lucifer-135/freshness-guard/internal/store"
@@ -36,6 +39,7 @@ type App struct {
 
 	store    *store.SQLite
 	engine   *engine.Engine
+	broker   *events.Broker
 	server   *api.Server
 	serverUp bool
 	logger   *slog.Logger
@@ -66,23 +70,28 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 
 	llmClient := llm.New(cfg.BifrostBaseURL, cfg.BifrostVirtualKey)
 	budget := engine.NewBudget(st, cfg.DailyCreditBudget, time.Now, logger)
+	broker := events.NewBroker()
 	pipeline := &engine.Pipeline{
 		Extract: &extract.Extractor{LLM: llmClient, Model: cfg.ExtractModel, Fallbacks: cfg.ExtractFallbacks, MaxClaims: cfg.MaxClaims},
 		Verify: &verify.Verifier{Search: tavily.New(cfg.TavilyBaseURL, cfg.TavilyAPIKey), LLM: llmClient,
 			Model: cfg.JudgeModel, Fallbacks: cfg.JudgeFallbacks, Budget: budget, Now: time.Now},
-		Facts:         &facts.Cache{Store: st, Now: time.Now},
-		Store:         st,
-		Budget:        budget,
-		Cutoffs:       cfg.ModelCutoffs,
-		RiskThreshold: cfg.RiskThreshold,
-		Now:           time.Now,
-		Logger:        logger,
+		Facts:           &facts.Cache{Store: st, Now: time.Now},
+		Store:           st,
+		Budget:          budget,
+		Heal:            &heal.Healer{LLM: llmClient, Model: cfg.HealModel, Fallbacks: cfg.HealFallbacks},
+		Events:          broker,
+		Cutoffs:         cfg.ModelCutoffs,
+		RiskThreshold:   cfg.RiskThreshold,
+		BlockConfidence: cfg.BlockConfidence,
+		Now:             time.Now,
+		Logger:          logger,
 	}
 	eng := engine.New(pipeline, cfg.Workers, cfg.QueueSize, logger)
 
 	handler := api.NewHandler(api.Deps{
 		Token: cfg.APIToken, Reports: st, Jobs: eng, NewID: newID, Now: time.Now,
-		CheckTimeout: api.DefaultCheckTimeout, Logger: logger,
+		CheckTimeout: api.DefaultCheckTimeout, Logger: logger, Events: broker,
+		Gateway: gateway.New(cfg.BifrostBaseURL, cfg.BifrostVirtualKey), Credits: budget,
 	})
 	return &App{
 		Config: cfg,
@@ -90,6 +99,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 			Logger: logger},
 		store:  st,
 		engine: eng,
+		broker: broker,
 		server: api.NewServer(fmt.Sprintf("%s:%d", cfg.APIHost, cfg.APIPort), handler, logger),
 		logger: logger,
 	}, nil
@@ -113,6 +123,8 @@ func (a *App) StopAPI(ctx context.Context) error {
 		return nil
 	}
 	a.serverUp = false
+	// Event streams never go idle; ending their subscriptions lets Shutdown finish.
+	a.broker.Close()
 	apiCtx, cancel := context.WithTimeout(ctx, apiStopTimeout)
 	defer cancel()
 	return a.server.Shutdown(apiCtx)
@@ -124,6 +136,7 @@ func (a *App) Stop(ctx context.Context) error {
 	engCtx, cancel := context.WithTimeout(ctx, engineStopTimeout)
 	errs = append(errs, a.engine.Stop(engCtx))
 	cancel()
+	a.broker.Close()
 	errs = append(errs, a.store.Close())
 	return errors.Join(errs...)
 }
