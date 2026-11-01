@@ -11,6 +11,32 @@ services:
     command: ["go", "test", "./..."]
     profiles: ["tools"]
 
+  bifrost:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: runtime
+      additional_contexts:
+        bifrost-src: ../.cache/bifrost-src
+    ports: ["8080:8080", "8090:8090"]
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - bifrost-data:/app/data
+      - ./config.json:/app/data/config.json:ro
+    depends_on: [fakeprovider]
+
+  fakeprovider:
+    image: golang:1.27.3-trixie
+    working_dir: /src
+    volumes:
+      - ..:/src
+      - gomodcache:/go/pkg/mod
+      - gobuildcache:/root/.cache/go-build
+    command: ["go", "run", "./test/fakeprovider"]
+
 volumes:
   gomodcache:
   gobuildcache:
+  bifrost-data:

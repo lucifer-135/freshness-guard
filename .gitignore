@@ -12,6 +12,9 @@ dist/
 node_modules/
 web/dist/
 
+# Fetched third-party source (deploy/fetch-bifrost.sh)
+.cache/
+
 # Runtime data
 data/
 *.db

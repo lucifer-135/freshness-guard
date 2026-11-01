@@ -1,0 +1,7 @@
+*
+!go.mod
+!go.sum
+!plugin
+!internal
+!test
+!cmd

@@ -1,0 +1,16 @@
+{
+  "providers": {
+    "openai": {
+      "keys": [{ "name": "fake", "value": "test-key", "models": [], "weight": 1.0 }],
+      "network_config": { "base_url": "http://fakeprovider:9000" }
+    }
+  },
+  "plugins": [
+    {
+      "enabled": true,
+      "name": "freshness-guard",
+      "path": "/app/plugins/freshness-guard.so",
+      "config": { "api": { "port": 8090, "token": "env.FG_API_TOKEN" } }
+    }
+  ]
+}
