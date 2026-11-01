@@ -2,13 +2,18 @@ package hooks_test
 
 import (
 	"fmt"
+	"io"
+	"log/slog"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/lucifer-135/freshness-guard/internal/hooks"
 )
 
 func chunk(text string) *schemas.BifrostResponse {
@@ -91,4 +96,43 @@ func TestStreamingStateIsRaceFree(t *testing.T) {
 
 	require.Len(t, jobs.jobs, 1)
 	assert.Equal(t, want.String(), jobs.jobs[0].Answer)
+}
+
+// A panic inside PostLLM (here from Now, which runs while the state is
+// locked) must leave the state usable: the plugin then marks the request
+// failed and the headers hook still runs.
+func TestPanicInPostLLMDoesNotDeadlock(t *testing.T) {
+	for _, streaming := range []bool{false, true} {
+		h := newHandler(&fakeSubmitter{})
+		h.Now = func() time.Time { panic("clock broke") }
+		ctx := newCtx()
+		h.TransportPre(ctx, &schemas.HTTPRequest{})
+		resp := chatResponse(&schemas.ChatMessageContent{ContentStr: str(testAnswer)})
+		if streaming {
+			h.PreLLM(ctx, chatRequest(schemas.ChatCompletionStreamRequest))
+			ctx.SetValue(schemas.BifrostContextKeyStreamEndIndicator, true)
+			resp = chunk("text")
+		} else {
+			h.PreLLM(ctx, chatRequest(schemas.ChatCompletionRequest))
+		}
+		ok := hooks.Guard(slog.New(slog.NewTextHandler(io.Discard, nil)), "PostLLMHook", func() error {
+			h.PostLLM(ctx, resp)
+			return nil
+		})
+		require.False(t, ok)
+
+		md := &schemas.HTTPResponseMetadata{}
+		done := make(chan struct{})
+		go func() {
+			hooks.MarkFailed(ctx)
+			h.ResponseHeaders(ctx, md)
+			close(done)
+		}()
+		select {
+		case <-done:
+		case <-time.After(time.Second):
+			t.Fatalf("streaming=%v: the request state stayed locked after a panic", streaming)
+		}
+		assert.Equal(t, "error", md.Header("X-Freshness-Status"))
+	}
 }

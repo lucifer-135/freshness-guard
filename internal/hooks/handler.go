@@ -76,8 +76,8 @@ func StateFrom(ctx *schemas.BifrostContext) *State {
 func MarkFailed(ctx *schemas.BifrostContext) {
 	if st := StateFrom(ctx); st != nil {
 		st.mu.Lock()
+		defer st.mu.Unlock()
 		st.Failed = true
-		st.mu.Unlock()
 	}
 }
 
@@ -167,34 +167,24 @@ func (h *Handler) PostLLM(ctx *schemas.BifrostContext, resp *schemas.BifrostResp
 	if st == nil {
 		return resp, nil
 	}
-	st.mu.Lock()
-	if st.Mode == ModeOff || st.Status != "" {
-		st.mu.Unlock()
+	plan := h.plan(ctx, st, resp)
+	if !plan.submit {
 		return resp, nil
 	}
-	if st.streaming {
-		h.collectChunk(ctx, st, resp)
-		return resp, nil
-	}
-	answer := answerText(resp)
-	if answer == "" {
-		st.mu.Unlock()
-		return resp, nil
-	}
-	job := engine.Job{
-		ReportID: st.ReportID, Answer: answer, Prompt: st.Prompt, Model: st.Model, Provider: st.Provider,
-		VirtualKey: st.VirtualKey, Mode: string(st.Mode), Policy: string(st.Policy), At: h.Now(),
-	}
-	mode, policy, id := st.Mode, st.Policy, st.ReportID
-	st.mu.Unlock()
 
-	result, ok := h.Jobs.Submit(job)
+	result, ok := h.Jobs.Submit(plan.job)
 	if !ok {
 		h.setStatus(st, StatusSkipped)
-		h.Logger.Warn("The verification queue is full, so this answer was not checked.", "report", id)
-		return h.unverified(resp, mode, policy, id)
+		h.Logger.Warn("The verification queue is full, so this answer was not checked.", "report", plan.job.ReportID)
+		if plan.streaming {
+			return resp, nil
+		}
+		return h.unverified(resp, plan.mode, plan.policy, plan.job.ReportID)
 	}
-	if mode != ModeSync {
+	if plan.streaming {
+		return resp, nil
+	}
+	if plan.mode != ModeSync {
 		h.setStatus(st, StatusPending)
 		return resp, nil
 	}
@@ -210,8 +200,73 @@ func (h *Handler) PostLLM(ctx *schemas.BifrostContext, resp *schemas.BifrostResp
 		}
 	case <-timer.C:
 	}
+	h.record(st, rep)
 
+	id := plan.job.ReportID
+	if rep == nil || rep.Status != report.StatusComplete {
+		return h.unverified(resp, plan.mode, plan.policy, id)
+	}
+	switch {
+	case plan.policy == PolicyBlock && rep.Blocked:
+		return nil, blockError(id, blockedOutdated)
+	case plan.policy == PolicyHeal && rep.HealedText != "":
+		setAnswer(resp, rep.HealedText)
+	}
+	return resp, nil
+}
+
+// postPlan is what PostLLM decided while holding the state lock.
+type postPlan struct {
+	submit    bool
+	streaming bool
+	job       engine.Job
+	mode      Mode
+	policy    Policy
+}
+
+// plan reads and updates the state under its lock. Every locked section
+// unlocks with defer, so a panic cannot leave the state locked for the hooks
+// that still run afterwards. For streams it adds the chunk's text to the
+// buffer and plans a submission only on the last chunk; streams are always
+// checked asynchronously, because their headers are sent before the answer
+// is complete (spec 8.5).
+func (h *Handler) plan(ctx *schemas.BifrostContext, st *State, resp *schemas.BifrostResponse) postPlan {
 	st.mu.Lock()
+	defer st.mu.Unlock()
+	if st.Mode == ModeOff || st.Status != "" {
+		return postPlan{}
+	}
+	if st.streaming {
+		st.buf.WriteString(deltaText(resp))
+		if end, _ := ctx.Value(schemas.BifrostContextKeyStreamEndIndicator).(bool); !end {
+			return postPlan{}
+		}
+		answer := st.buf.String()
+		st.buf.Reset()
+		if answer == "" {
+			st.Status = StatusSkipped
+			return postPlan{}
+		}
+		st.Status = StatusPending
+		return postPlan{submit: true, streaming: true, job: engine.Job{
+			ReportID: st.ReportID, Answer: answer, Prompt: st.Prompt, Model: st.Model, Provider: st.Provider,
+			VirtualKey: st.VirtualKey, Mode: string(ModeAsync), At: h.Now(),
+		}}
+	}
+	answer := answerText(resp)
+	if answer == "" {
+		return postPlan{}
+	}
+	return postPlan{submit: true, mode: st.Mode, policy: st.Policy, job: engine.Job{
+		ReportID: st.ReportID, Answer: answer, Prompt: st.Prompt, Model: st.Model, Provider: st.Provider,
+		VirtualKey: st.VirtualKey, Mode: string(st.Mode), Policy: string(st.Policy), At: h.Now(),
+	}}
+}
+
+// record stores the outcome of a sync wait: nil means it timed out.
+func (h *Handler) record(st *State, rep *report.Report) {
+	st.mu.Lock()
+	defer st.mu.Unlock()
 	switch {
 	case rep == nil:
 		st.Status = StatusPending
@@ -219,47 +274,6 @@ func (h *Handler) PostLLM(ctx *schemas.BifrostContext, resp *schemas.BifrostResp
 		st.Report, st.Status = rep, StatusComplete
 	default:
 		st.Report, st.Status = rep, StatusError
-	}
-	st.mu.Unlock()
-
-	if rep == nil || rep.Status != report.StatusComplete {
-		return h.unverified(resp, mode, policy, id)
-	}
-	switch {
-	case policy == PolicyBlock && rep.Blocked:
-		return nil, blockError(id, blockedOutdated)
-	case policy == PolicyHeal && rep.HealedText != "":
-		setAnswer(resp, rep.HealedText)
-	}
-	return resp, nil
-}
-
-// collectChunk adds a stream chunk's text to the buffer and, on the last
-// chunk, submits the whole answer. Streams are always checked asynchronously,
-// because their headers are sent before the answer is complete (spec 8.5).
-// The caller holds st.mu; collectChunk releases it.
-func (h *Handler) collectChunk(ctx *schemas.BifrostContext, st *State, resp *schemas.BifrostResponse) {
-	st.buf.WriteString(deltaText(resp))
-	if end, _ := ctx.Value(schemas.BifrostContextKeyStreamEndIndicator).(bool); !end {
-		st.mu.Unlock()
-		return
-	}
-	answer := st.buf.String()
-	st.buf.Reset()
-	st.Status = StatusPending
-	if answer == "" {
-		st.Status = StatusSkipped
-		st.mu.Unlock()
-		return
-	}
-	job := engine.Job{
-		ReportID: st.ReportID, Answer: answer, Prompt: st.Prompt, Model: st.Model, Provider: st.Provider,
-		VirtualKey: st.VirtualKey, Mode: string(ModeAsync), At: h.Now(),
-	}
-	st.mu.Unlock()
-	if _, ok := h.Jobs.Submit(job); !ok {
-		h.setStatus(st, StatusSkipped)
-		h.Logger.Warn("The verification queue is full, so this streamed answer was not checked.", "report", job.ReportID)
 	}
 }
 
@@ -285,8 +299,8 @@ func (h *Handler) unverified(resp *schemas.BifrostResponse, mode Mode, policy Po
 
 func (h *Handler) setStatus(st *State, status string) {
 	st.mu.Lock()
+	defer st.mu.Unlock()
 	st.Status = status
-	st.mu.Unlock()
 }
 
 // blockError is final: Bifrost must not retry a blocked answer on a fallback.
