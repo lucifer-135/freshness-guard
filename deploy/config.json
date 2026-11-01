@@ -1,8 +1,9 @@
 {
+  "client": { "enforce_auth_on_inference": false },
   "providers": {
     "openai": {
-      "keys": [{ "name": "fake", "value": "test-key", "models": [], "weight": 1.0 }],
-      "network_config": { "base_url": "http://fakeprovider:9000" }
+      "keys": [{ "name": "fake", "value": "test-key", "models": ["*"], "weight": 1.0 }],
+      "network_config": { "base_url": "http://fakeprovider:9000", "allow_private_network": true }
     }
   },
   "plugins": [
