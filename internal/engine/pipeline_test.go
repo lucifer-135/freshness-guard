@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/lucifer-135/freshness-guard/internal/engine"
+	"github.com/lucifer-135/freshness-guard/internal/events"
 	"github.com/lucifer-135/freshness-guard/internal/extract"
 	"github.com/lucifer-135/freshness-guard/internal/report"
 )
@@ -261,4 +262,131 @@ func TestRunWithoutClaimsCompletes(t *testing.T) {
 	assert.Equal(t, report.StatusComplete, r.Status)
 	assert.NotNil(t, r.Claims)
 	assert.Equal(t, 0, r.TotalClaims)
+}
+
+type fakePublisher struct {
+	mu     sync.Mutex
+	events []events.Event
+}
+
+func (f *fakePublisher) Publish(e events.Event) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.events = append(f.events, e)
+}
+
+func (f *fakePublisher) types() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []string
+	for _, e := range f.events {
+		out = append(out, e.Type)
+	}
+	return out
+}
+
+type fakeHealer struct {
+	calls  int
+	answer string
+	claims []report.Claim
+}
+
+func (f *fakeHealer) Heal(_ context.Context, answer string, claims []report.Claim) (string, int, error) {
+	f.calls++
+	f.answer, f.claims = answer, claims
+	return "healed answer", 1, nil
+}
+
+func TestRunPublishesEvents(t *testing.T) {
+	pub := &fakePublisher{}
+	p := newPipeline(&fakeExtractor{claims: twoClaims()}, &fakeVerifier{edit: markStale, credit: 1}, &fakeFacts{}, &fakeReports{}, 30)
+	p.Events = pub
+	p.Run(context.Background(), baseJob)
+	assert.Equal(t, []string{events.TypeReportStarted, events.TypeReportClaims, events.TypeClaimVerdict, events.TypeReportComplete}, pub.types())
+	for _, e := range pub.events {
+		assert.Equal(t, "r-1", e.ReportID)
+	}
+	verdict := pub.events[2].Data.(map[string]any)["claim"].(report.Claim)
+	assert.Equal(t, "c1", verdict.ID)
+	complete := pub.events[3].Data.(map[string]any)
+	assert.Equal(t, report.StatusComplete, complete["status"])
+	assert.Equal(t, 1, complete["stale_count"])
+}
+
+func TestRunErrorPublishesErrorEvent(t *testing.T) {
+	pub := &fakePublisher{}
+	p := newPipeline(&fakeExtractor{err: errors.New("down")}, &fakeVerifier{}, &fakeFacts{}, &fakeReports{}, 30)
+	p.Events = pub
+	p.Run(context.Background(), baseJob)
+	types := pub.types()
+	require.NotEmpty(t, types)
+	assert.Equal(t, events.TypeReportError, types[len(types)-1])
+	assert.Contains(t, pub.events[len(pub.events)-1].Data.(map[string]any)["reason"], "Claim extraction failed")
+}
+
+func TestRunHealsSyncHealRequests(t *testing.T) {
+	h := &fakeHealer{}
+	p := newPipeline(&fakeExtractor{claims: twoClaims()}, &fakeVerifier{edit: markStale}, &fakeFacts{}, &fakeReports{}, 30)
+	p.Heal = h
+	job := baseJob
+	job.Mode, job.Policy = "sync", "heal"
+	r := p.Run(context.Background(), job)
+	assert.Equal(t, 1, h.calls)
+	assert.Equal(t, baseJob.Answer, h.answer)
+	assert.Len(t, h.claims, 2)
+	assert.Equal(t, "healed answer", r.HealedText)
+	assert.Equal(t, 1, r.HealedCount)
+	assert.Equal(t, "heal", r.Policy)
+}
+
+func TestRunDoesNotHealAsyncOrOtherPolicies(t *testing.T) {
+	for _, mp := range [][2]string{{"async", "heal"}, {"sync", "annotate"}, {"sync", "block"}} {
+		h := &fakeHealer{}
+		p := newPipeline(&fakeExtractor{claims: twoClaims()}, &fakeVerifier{edit: markStale}, &fakeFacts{}, &fakeReports{}, 30)
+		p.Heal = h
+		job := baseJob
+		job.Mode, job.Policy = mp[0], mp[1]
+		r := p.Run(context.Background(), job)
+		assert.Equal(t, 0, h.calls, mp)
+		assert.Empty(t, r.HealedText, mp)
+	}
+}
+
+func TestRunMarksBlocked(t *testing.T) {
+	run := func(policy string, confidence float64) bool {
+		v := &fakeVerifier{edit: func(c []report.Claim) []report.Claim {
+			c = markStale(c)
+			c[0].Confidence = confidence
+			return c
+		}}
+		p := newPipeline(&fakeExtractor{claims: twoClaims()}, v, &fakeFacts{}, &fakeReports{}, 30)
+		p.BlockConfidence = 0.7
+		job := baseJob
+		job.Mode, job.Policy = "sync", policy
+		return p.Run(context.Background(), job).Blocked
+	}
+	assert.True(t, run("block", 0.9))
+	assert.False(t, run("block", 0.5))
+	assert.False(t, run("heal", 0.9))
+}
+
+func TestRunFillsExplanations(t *testing.T) {
+	published := doneAt.Add(-24 * time.Hour)
+	v := &fakeVerifier{edit: func(c []report.Claim) []report.Claim {
+		c[0].Verdict = report.VerdictFresh
+		c[0].Confidence = 0.8
+		c[0].Evidence = []report.Evidence{{URL: "https://example.com", Authority: 1, Stance: report.StanceSupports, PublishedDate: &published}}
+		return c
+	}}
+	r := newPipeline(&fakeExtractor{claims: twoClaims()}, v, &fakeFacts{}, &fakeReports{}, 30).Run(context.Background(), baseJob)
+	assert.Equal(t, 365, r.ModelAgeDays)
+	assert.Equal(t, 60, r.Claims[0].HalfLifeDays)
+	assert.Equal(t, 0, r.Claims[1].HalfLifeDays)
+	require.NotNil(t, r.Claims[0].ScoreParts)
+	assert.Equal(t, 1.0, r.Claims[0].ScoreParts.Authority)
+	assert.Nil(t, r.Claims[1].ScoreParts)
+
+	stale := newPipeline(&fakeExtractor{claims: twoClaims()}, &fakeVerifier{edit: markStale}, &fakeFacts{}, &fakeReports{}, 30).
+		Run(context.Background(), baseJob)
+	assert.Nil(t, stale.Claims[0].ScoreParts)
 }

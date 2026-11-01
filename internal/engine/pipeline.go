@@ -7,6 +7,7 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/lucifer-135/freshness-guard/internal/events"
 	"github.com/lucifer-135/freshness-guard/internal/extract"
 	"github.com/lucifer-135/freshness-guard/internal/facts"
 	"github.com/lucifer-135/freshness-guard/internal/report"
@@ -23,6 +24,7 @@ type Job struct {
 	Provider   string
 	VirtualKey string
 	Mode       string
+	Policy     string
 	At         time.Time
 }
 
@@ -47,17 +49,27 @@ type ReportStore interface {
 	SaveReport(ctx context.Context, r report.Report) error
 }
 
-// Pipeline checks one answer: extract, triage, verify, score and store.
+// Healer corrects the outdated claims of an answer; *heal.Healer implements it.
+type Healer interface {
+	Heal(ctx context.Context, answer string, claims []report.Claim) (string, int, error)
+}
+
+// Pipeline checks one answer: extract, triage, verify, score, heal and store.
 type Pipeline struct {
 	Extract       Extractor
 	Verify        Verifier
 	Facts         FactCache
 	Store         ReportStore
 	Budget        *Budget
+	Heal          Healer
+	Events        events.Publisher // nil means no events
 	Cutoffs       map[string]time.Time
 	RiskThreshold float64
-	Now           func() time.Time
-	Logger        *slog.Logger
+	// BlockConfidence is the judge confidence from which a STALE or WRONG
+	// claim blocks an answer under the block policy.
+	BlockConfidence float64
+	Now             func() time.Time
+	Logger          *slog.Logger
 }
 
 // saveTimeout limits each report save. Saves do not use the job context, so a
@@ -70,13 +82,15 @@ const internalErrorReason = "An internal error stopped the verification."
 // budgetReason explains a risky claim the credit budget left unchecked.
 const budgetReason = "This claim was not checked because today's Tavily credit budget is used up or kept for riskier claims."
 
+const day = 24 * time.Hour
+
 // Run checks the job's answer and returns the finished report. It never fails:
 // problems, including panics, end up in the report's status and reason, and
 // storage errors are logged.
 func (p *Pipeline) Run(ctx context.Context, job Job) (r report.Report) {
 	r = report.Report{
 		ID: job.ReportID, CreatedAt: job.At, Model: job.Model, Provider: job.Provider, VirtualKey: job.VirtualKey,
-		Mode: job.Mode, Status: report.StatusPending, Prompt: job.Prompt, AnswerText: job.Answer,
+		Mode: job.Mode, Policy: job.Policy, Status: report.StatusPending, Prompt: job.Prompt, AnswerText: job.Answer,
 		Claims: []report.Claim{},
 	}
 	defer func() {
@@ -86,11 +100,14 @@ func (p *Pipeline) Run(ctx context.Context, job Job) (r report.Report) {
 		}
 	}()
 	p.save(ctx, r)
+	p.publish(events.TypeReportStarted, r.ID, map[string]any{
+		"model": job.Model, "provider": job.Provider, "mode": job.Mode, "policy": job.Policy,
+	})
 	return p.run(ctx, job, r)
 }
 
 func (p *Pipeline) run(ctx context.Context, job Job, r report.Report) report.Report {
-
+	started := p.Now()
 	claims, err := p.Extract.Extract(ctx, extract.Input{Answer: job.Answer, Prompt: job.Prompt, Model: job.Model, At: job.At})
 	if err != nil {
 		return p.fail(ctx, r, fmt.Sprintf("Claim extraction failed: %v", err))
@@ -98,11 +115,16 @@ func (p *Pipeline) run(ctx context.Context, job Job, r report.Report) report.Rep
 	if claims == nil {
 		claims = []report.Claim{}
 	}
+	extractDone := p.Now()
 
 	age := triage.ModelAge(job.Model, p.Cutoffs, p.Now())
+	r.ModelAgeDays = int(age / day)
 	for i := range claims {
 		c := &claims[i]
 		c.PChanged = triage.PChanged(c.Category, age, c.TemporalMarker != "")
+		if hl, ok := triage.HalfLife(c.Category); ok {
+			c.HalfLifeDays = int(hl / day)
+		}
 		if fact, ok := p.Facts.Fresh(ctx, c.Entity, c.Attribute, c.Category); ok {
 			c.Checked = true
 			c.CacheHit = true
@@ -118,6 +140,7 @@ func (p *Pipeline) run(ctx context.Context, job Job, r report.Report) report.Rep
 			c.Rationale = budgetReason
 		}
 	}
+	p.publish(events.TypeReportClaims, r.ID, map[string]any{"claims": claims})
 
 	if anyChecked(claims) {
 		verified, credits, err := p.Verify.Verify(ctx, claims)
@@ -128,11 +151,13 @@ func (p *Pipeline) run(ctx context.Context, job Job, r report.Report) report.Rep
 		}
 		claims = verified
 	}
+	verifyDone := p.Now()
 
 	now := p.Now()
 	for i := range claims {
 		c := &claims[i]
 		c.Score = score.Claim(*c, now)
+		c.ScoreParts = score.Explain(*c, now)
 		// A cache hit keeps the stored fact as it is; recording it would
 		// refresh the fact from its own cached value forever.
 		if !c.Checked || c.CacheHit {
@@ -146,6 +171,22 @@ func (p *Pipeline) run(ctx context.Context, job Job, r report.Report) report.Rep
 			c.FactID = &id
 		}
 	}
+	for _, c := range claims {
+		if c.Checked {
+			p.publish(events.TypeClaimVerdict, r.ID, map[string]any{"claim": c})
+		}
+	}
+
+	// Correction runs only when the client waits for it (sync mode, heal policy).
+	if job.Mode == "sync" && job.Policy == "heal" && p.Heal != nil {
+		text, healed, err := p.Heal.Heal(ctx, job.Answer, claims)
+		if err != nil {
+			p.Logger.Error("The answer could not be corrected.", "report", r.ID, "error", err)
+		} else {
+			r.HealedText, r.HealedCount = text, healed
+		}
+	}
+	healDone := p.Now()
 
 	r.Claims = claims
 	r.Score = score.Answer(claims)
@@ -156,11 +197,24 @@ func (p *Pipeline) run(ctx context.Context, job Job, r report.Report) report.Rep
 		}
 		if c.Verdict == report.VerdictStale || c.Verdict == report.VerdictWrong {
 			r.StaleCount++
+			if job.Policy == "block" && c.Confidence >= p.BlockConfidence {
+				r.Blocked = true
+			}
 		}
 	}
-	r.LatencyMS = now.Sub(job.At).Milliseconds()
+	end := p.Now()
+	r.LatencyMS = end.Sub(job.At).Milliseconds()
 	r.Status = report.StatusComplete
 	p.save(ctx, r)
+	p.publish(events.TypeReportComplete, r.ID, map[string]any{
+		"status": r.Status, "score": r.Score, "stale_count": r.StaleCount, "checked_count": r.CheckedCount,
+		"total_claims": r.TotalClaims, "healed_count": r.HealedCount, "blocked": r.Blocked,
+		"latency_ms": r.LatencyMS, "credits_used": r.CreditsUsed,
+	})
+	p.Logger.Info("A freshness report finished.", "report", r.ID, "status", r.Status, "claims", r.TotalClaims,
+		"checked", r.CheckedCount, "credits", r.CreditsUsed,
+		"extract_ms", extractDone.Sub(started).Milliseconds(), "verify_ms", verifyDone.Sub(extractDone).Milliseconds(),
+		"heal_ms", healDone.Sub(verifyDone).Milliseconds())
 	return r
 }
 
@@ -179,6 +233,7 @@ func (p *Pipeline) fail(ctx context.Context, r report.Report, reason string) rep
 	r.TotalClaims = len(r.Claims)
 	r.LatencyMS = p.Now().Sub(r.CreatedAt).Milliseconds()
 	p.save(ctx, r)
+	p.publish(events.TypeReportError, r.ID, map[string]any{"reason": reason})
 	return r
 }
 
@@ -188,4 +243,11 @@ func (p *Pipeline) save(ctx context.Context, r report.Report) {
 	if err := p.Store.SaveReport(ctx, r); err != nil {
 		p.Logger.Error("A freshness report could not be saved.", "report", r.ID, "status", r.Status, "error", err)
 	}
+}
+
+func (p *Pipeline) publish(typ, reportID string, data any) {
+	if p.Events == nil {
+		return
+	}
+	p.Events.Publish(events.Event{Type: typ, ReportID: reportID, At: p.Now(), Data: data})
 }
