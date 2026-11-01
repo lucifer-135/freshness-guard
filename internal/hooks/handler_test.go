@@ -186,6 +186,60 @@ func TestContentBlocksAreJoined(t *testing.T) {
 	assert.Equal(t, "a\nb", jobs.jobs[0].Answer)
 }
 
+// Bifrost runs the LLM hooks once per attempt. A failed primary attempt must
+// not stop the fallback's answer from being checked.
+func TestFallbackAnswerIsSubmitted(t *testing.T) {
+	jobs := &fakeSubmitter{}
+	h := newHandler(jobs)
+	ctx := newCtx()
+	h.TransportPre(ctx, &schemas.HTTPRequest{})
+	h.PreLLM(ctx, chatRequest(schemas.ChatCompletionRequest))
+	h.PostLLM(ctx, nil) // primary attempt failed
+
+	fallback := chatRequest(schemas.ChatCompletionRequest)
+	fallback.ChatRequest.Provider = "gemini"
+	fallback.ChatRequest.Model = "gemini-3.5-flash"
+	h.PreLLM(ctx, fallback)
+	h.PostLLM(ctx, chatResponse(&schemas.ChatMessageContent{ContentStr: str(testAnswer)}))
+
+	md := &schemas.HTTPResponseMetadata{}
+	h.ResponseHeaders(ctx, md)
+	require.Len(t, jobs.jobs, 1)
+	assert.Equal(t, "gemini/gemini-3.5-flash", jobs.jobs[0].Model)
+	assert.Equal(t, "pending", md.Header("X-Freshness-Status"))
+}
+
+func TestTransportPreReadsVirtualKeyFromOtherHeaders(t *testing.T) {
+	cases := map[string]struct {
+		headers map[string]string
+		want    string
+	}{
+		"bearer virtual key":     {map[string]string{"Authorization": "Bearer sk-bf-abc"}, "sk-bf-abc"},
+		"lowercase bearer":       {map[string]string{"authorization": "bearer  sk-bf-abc "}, "sk-bf-abc"},
+		"bearer provider key":    {map[string]string{"Authorization": "Bearer sk-openai-123"}, ""},
+		"x-api-key":              {map[string]string{"x-api-key": "sk-bf-x"}, "sk-bf-x"},
+		"x-goog-api-key":         {map[string]string{"x-goog-api-key": "sk-bf-g"}, "sk-bf-g"},
+		"api-key":                {map[string]string{"api-key": "sk-bf-a"}, "sk-bf-a"},
+		"x-api-key provider key": {map[string]string{"x-api-key": "anthropic-key"}, ""},
+		"x-bf-vk wins":           {map[string]string{"x-bf-vk": "vk-1", "Authorization": "Bearer sk-bf-abc"}, "vk-1"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			ctx := newCtx()
+			newHandler(&fakeSubmitter{}).TransportPre(ctx, &schemas.HTTPRequest{Headers: tc.headers})
+			assert.Equal(t, tc.want, hooks.StateFrom(ctx).VirtualKey)
+		})
+	}
+}
+
+func TestVirtualKeyModeAppliesToBearerKeys(t *testing.T) {
+	h := newHandler(&fakeSubmitter{})
+	h.Config.VirtualKeys = map[string]config.VirtualKey{"sk-bf-off": {Mode: "off", SampleRate: 1}}
+	ctx := newCtx()
+	h.TransportPre(ctx, &schemas.HTTPRequest{Headers: map[string]string{"Authorization": "Bearer sk-bf-off"}})
+	assert.Equal(t, hooks.ModeOff, hooks.StateFrom(ctx).Mode)
+}
+
 func TestEmptyAnswerIsSkipped(t *testing.T) {
 	jobs := &fakeSubmitter{}
 	md := runChat(newHandler(jobs), nil, &schemas.ChatMessageContent{ContentStr: str("")})

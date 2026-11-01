@@ -60,10 +60,34 @@ func MarkFailed(ctx *schemas.BifrostContext) {
 	}
 }
 
+// virtualKeyPrefix marks Bifrost virtual keys sent in provider-style headers.
+const virtualKeyPrefix = "sk-bf-"
+
+// virtualKey finds the request's virtual key the way Bifrost does: x-bf-vk
+// first, then a bearer token or an API-key header that starts with "sk-bf-".
+func virtualKey(lookup func(string) string) string {
+	if vk := strings.TrimSpace(lookup(HeaderVirtualKey)); vk != "" {
+		return vk
+	}
+	isVirtualKey := func(v string) bool { return strings.HasPrefix(strings.ToLower(v), virtualKeyPrefix) }
+	if auth := strings.TrimSpace(lookup("authorization")); len(auth) > 7 && strings.EqualFold(auth[:7], "bearer ") {
+		if v := strings.TrimSpace(auth[7:]); isVirtualKey(v) {
+			return v
+		}
+	}
+	for _, header := range []string{"x-api-key", "x-goog-api-key", "api-key"} {
+		if v := strings.TrimSpace(lookup(header)); isVirtualKey(v) {
+			return v
+		}
+	}
+	return ""
+}
+
 func (h *Handler) newState(ctx *schemas.BifrostContext, lookup func(string) string) *State {
+	vk := virtualKey(lookup)
 	st := &State{
-		Mode:       SelectMode(lookup(HeaderFreshness), lookup(HeaderVirtualKey), h.Config, h.Sample()),
-		VirtualKey: lookup(HeaderVirtualKey),
+		Mode:       SelectMode(lookup(HeaderFreshness), vk, h.Config, h.Sample()),
+		VirtualKey: vk,
 	}
 	if st.Mode != ModeOff {
 		st.ReportID = h.NewID()
@@ -106,7 +130,10 @@ func (h *Handler) PreLLM(ctx *schemas.BifrostContext, req *schemas.BifrostReques
 	}
 }
 
-// PostLLM submits the answer for verification.
+// PostLLM submits the answer for verification. Bifrost runs the LLM hooks
+// once per attempt, so an attempt without an answer (a failed primary before
+// a fallback) leaves the status open; the headers hook reports "skipped" when
+// no attempt produced an answer.
 func (h *Handler) PostLLM(ctx *schemas.BifrostContext, resp *schemas.BifrostResponse) {
 	st := StateFrom(ctx)
 	if st == nil || st.Mode == ModeOff || st.Status != "" {
@@ -114,7 +141,6 @@ func (h *Handler) PostLLM(ctx *schemas.BifrostContext, resp *schemas.BifrostResp
 	}
 	answer := answerText(resp)
 	if answer == "" {
-		st.Status = StatusSkipped
 		return
 	}
 	_, ok := h.Jobs.Submit(engine.Job{
