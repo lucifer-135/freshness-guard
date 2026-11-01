@@ -69,7 +69,20 @@ type Report struct {
 	TotalClaims  int       `json:"total_claims"`
 	LatencyMS    int64     `json:"latency_ms"`
 	CreditsUsed  int       `json:"credits_used"`
+	Policy       string    `json:"policy"`
+	HealedText   string    `json:"healed_text"`
+	HealedCount  int       `json:"healed_count"`
+	Blocked      bool      `json:"blocked"`
+	ModelAgeDays int       `json:"model_age_days"`
 	Claims       []Claim   `json:"claims"`
+}
+
+// ScoreParts are the factors of a FRESH claim's score: evidence recency,
+// source authority and agreement between sources.
+type ScoreParts struct {
+	Recency   float64 `json:"recency"`
+	Authority float64 `json:"authority"`
+	Agreement float64 `json:"agreement"`
 }
 
 // Claim is one factual statement found in an answer. Spans are UTF-16
@@ -92,6 +105,8 @@ type Claim struct {
 	CurrentValue   string          `json:"current_value"`
 	AsOf           string          `json:"as_of"`
 	Score          *int            `json:"score"`
+	ScoreParts     *ScoreParts     `json:"score_parts"`
+	HalfLifeDays   int             `json:"half_life_days"` // 0 when the fact never changes
 	Confidence     float64         `json:"confidence"`
 	Rationale      string          `json:"rationale"`
 	FactID         *int64          `json:"fact_id"`

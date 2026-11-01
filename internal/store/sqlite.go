@@ -135,15 +135,19 @@ func (s *SQLite) SaveReport(ctx context.Context, r report.Report) error {
 	defer tx.Rollback()
 
 	_, err = tx.ExecContext(ctx, `INSERT INTO reports (id, created_at, model, provider, virtual_key, mode, status, reason,
-		prompt, answer_text, score, stale_count, checked_count, total_claims, latency_ms, credits_used)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		prompt, answer_text, score, stale_count, checked_count, total_claims, latency_ms, credits_used,
+		policy, healed_text, healed_count, blocked, model_age_days)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET created_at = excluded.created_at, model = excluded.model,
 		provider = excluded.provider, virtual_key = excluded.virtual_key, mode = excluded.mode, status = excluded.status,
 		reason = excluded.reason, prompt = excluded.prompt, answer_text = excluded.answer_text, score = excluded.score,
 		stale_count = excluded.stale_count, checked_count = excluded.checked_count, total_claims = excluded.total_claims,
-		latency_ms = excluded.latency_ms, credits_used = excluded.credits_used`,
-		r.ID, formatTime(r.CreatedAt), r.Model, r.Provider, r.VirtualKey, r.Mode, string(r.Status), r.Reason,
-		r.Prompt, r.AnswerText, nullInt(r.Score), r.StaleCount, r.CheckedCount, r.TotalClaims, r.LatencyMS, r.CreditsUsed)
+		latency_ms = excluded.latency_ms, credits_used = excluded.credits_used, policy = excluded.policy,
+		healed_text = excluded.healed_text, healed_count = excluded.healed_count, blocked = excluded.blocked,
+		model_age_days = excluded.model_age_days`,
+		r.ID, formatTime(r.CreatedAt), r.Model, r.Provider, HashVirtualKey(r.VirtualKey), r.Mode, string(r.Status), r.Reason,
+		r.Prompt, r.AnswerText, nullInt(r.Score), r.StaleCount, r.CheckedCount, r.TotalClaims, r.LatencyMS, r.CreditsUsed,
+		r.Policy, r.HealedText, r.HealedCount, r.Blocked, r.ModelAgeDays)
 	if err != nil {
 		return fmt.Errorf("save report: %w", err)
 	}
@@ -152,13 +156,18 @@ func (s *SQLite) SaveReport(ctx context.Context, r report.Report) error {
 	}
 
 	for i, c := range r.Claims {
+		var recency, authority, agreement any
+		if p := c.ScoreParts; p != nil {
+			recency, authority, agreement = p.Recency, p.Authority, p.Agreement
+		}
 		res, err := tx.ExecContext(ctx, `INSERT INTO claims (report_id, position, claim_ref, quote, span_start, span_end,
 			entity, attribute, value, category, temporal_marker, search_query, p_changed, checked, cache_hit, verdict,
-			current_value, as_of, score, confidence, rationale, fact_id)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			current_value, as_of, score, confidence, rationale, fact_id, half_life_days, score_recency, score_authority,
+			score_agreement)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			r.ID, i, c.ID, c.Quote, c.SpanStart, c.SpanEnd, c.Entity, c.Attribute, c.Value, string(c.Category),
 			c.TemporalMarker, c.SearchQuery, c.PChanged, c.Checked, c.CacheHit, string(c.Verdict), c.CurrentValue, c.AsOf,
-			nullInt(c.Score), c.Confidence, c.Rationale, nullInt64(c.FactID))
+			nullInt(c.Score), c.Confidence, c.Rationale, nullInt64(c.FactID), c.HalfLifeDays, recency, authority, agreement)
 		if err != nil {
 			return fmt.Errorf("save claim %s: %w", c.ID, err)
 		}
@@ -179,7 +188,8 @@ func (s *SQLite) SaveReport(ctx context.Context, r report.Report) error {
 }
 
 const reportColumns = `id, created_at, model, provider, virtual_key, mode, status, reason, prompt, answer_text, score,
-	stale_count, checked_count, total_claims, latency_ms, credits_used`
+	stale_count, checked_count, total_claims, latency_ms, credits_used, policy, healed_text, healed_count, blocked,
+	model_age_days`
 
 type scanner interface{ Scan(dest ...any) error }
 
@@ -191,7 +201,8 @@ func scanReport(row scanner) (report.Report, error) {
 		score   sql.NullInt64
 	)
 	err := row.Scan(&r.ID, &created, &r.Model, &r.Provider, &r.VirtualKey, &r.Mode, &status, &r.Reason, &r.Prompt,
-		&r.AnswerText, &score, &r.StaleCount, &r.CheckedCount, &r.TotalClaims, &r.LatencyMS, &r.CreditsUsed)
+		&r.AnswerText, &score, &r.StaleCount, &r.CheckedCount, &r.TotalClaims, &r.LatencyMS, &r.CreditsUsed,
+		&r.Policy, &r.HealedText, &r.HealedCount, &r.Blocked, &r.ModelAgeDays)
 	if err != nil {
 		return r, err
 	}
@@ -239,7 +250,7 @@ func (s *SQLite) GetReport(ctx context.Context, id string) (report.Report, error
 func (s *SQLite) loadClaims(ctx context.Context, r *report.Report) (map[int64]int, error) {
 	rows, err := s.r.QueryContext(ctx, `SELECT id, claim_ref, quote, span_start, span_end, entity, attribute, value,
 		category, temporal_marker, search_query, p_changed, checked, cache_hit, verdict, current_value, as_of, score,
-		confidence, rationale, fact_id FROM claims WHERE report_id = ? ORDER BY position`, r.ID)
+		confidence, rationale, fact_id, half_life_days, score_recency, score_authority, score_agreement FROM claims WHERE report_id = ? ORDER BY position`, r.ID)
 	if err != nil {
 		return nil, fmt.Errorf("load claims: %w", err)
 	}
@@ -254,10 +265,12 @@ func (s *SQLite) loadClaims(ctx context.Context, r *report.Report) (map[int64]in
 			category, verdict string
 			score             sql.NullInt64
 			factID            sql.NullInt64
+
+			recency, authority, agreement sql.NullFloat64
 		)
 		err := rows.Scan(&rowID, &c.ID, &c.Quote, &c.SpanStart, &c.SpanEnd, &c.Entity, &c.Attribute, &c.Value, &category,
 			&c.TemporalMarker, &c.SearchQuery, &c.PChanged, &c.Checked, &c.CacheHit, &verdict, &c.CurrentValue, &c.AsOf,
-			&score, &c.Confidence, &c.Rationale, &factID)
+			&score, &c.Confidence, &c.Rationale, &factID, &c.HalfLifeDays, &recency, &authority, &agreement)
 		if err != nil {
 			return nil, fmt.Errorf("read claim: %w", err)
 		}
@@ -270,6 +283,9 @@ func (s *SQLite) loadClaims(ctx context.Context, r *report.Report) (map[int64]in
 		if factID.Valid {
 			v := factID.Int64
 			c.FactID = &v
+		}
+		if recency.Valid {
+			c.ScoreParts = &report.ScoreParts{Recency: recency.Float64, Authority: authority.Float64, Agreement: agreement.Float64}
 		}
 		c.Evidence = []report.Evidence{}
 		c.Timeline = []report.TimelineEntry{}

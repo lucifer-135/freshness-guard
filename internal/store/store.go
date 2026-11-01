@@ -3,7 +3,10 @@ package store
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/lucifer-135/freshness-guard/internal/report"
@@ -35,6 +38,19 @@ func EffectiveLimit(n int) int {
 		return n
 	}
 }
+
+// HashVirtualKey returns the form in which a virtual key is stored: a short
+// SHA-256 prefix, because the key is a credential. It is empty for an empty
+// key and leaves an already hashed value unchanged.
+func HashVirtualKey(key string) string {
+	if key == "" || strings.HasPrefix(key, hashPrefix) {
+		return key
+	}
+	sum := sha256.Sum256([]byte(key))
+	return hashPrefix + hex.EncodeToString(sum[:])[:16]
+}
+
+const hashPrefix = "sha256:"
 
 // Store is the storage used by the pipeline and the API.
 type Store interface {

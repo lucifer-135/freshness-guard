@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -35,11 +36,13 @@ func sampleReport(id string, created time.Time) report.Report {
 		ID: id, CreatedAt: created, Model: "groq/x", Provider: "groq", VirtualKey: "vk", Mode: "async",
 		Status: report.StatusComplete, Prompt: "What does it cost?", AnswerText: "It costs $20.",
 		Score: intPtr(42), StaleCount: 1, CheckedCount: 1, TotalClaims: 2, LatencyMS: 1500, CreditsUsed: 1,
+		Policy: "heal", HealedText: "fixed", HealedCount: 1, Blocked: true, ModelAgeDays: 365,
 		Claims: []report.Claim{
 			{
 				ID: "c1", Quote: "costs $20", SpanStart: 3, SpanEnd: 12, Entity: "Example", Attribute: "price", Value: "$20",
 				Category: report.CategoryPricing, TemporalMarker: "currently", SearchQuery: "example price",
 				PChanged: 0.9, Checked: true, Verdict: report.VerdictStale, CurrentValue: "$25", AsOf: "2026-09-01",
+				HalfLifeDays: 60, ScoreParts: &report.ScoreParts{Recency: 0.5, Authority: 1, Agreement: 0.5},
 				Score: intPtr(2), Confidence: 0.9, Rationale: "The price changed.",
 				Evidence: []report.Evidence{
 					{Ref: "E1", URL: "https://example.com/p", Title: "Pricing", Domain: "example.com", PublishedDate: &published,
@@ -69,7 +72,7 @@ func TestOpenAppliesMigrationsOnce(t *testing.T) {
 	defer db.Close()
 	var version int
 	require.NoError(t, db.QueryRow("PRAGMA user_version").Scan(&version))
-	assert.Equal(t, 1, version)
+	assert.Equal(t, 2, version)
 }
 
 func TestSaveAndGetReportRoundTrip(t *testing.T) {
@@ -78,6 +81,7 @@ func TestSaveAndGetReportRoundTrip(t *testing.T) {
 	require.NoError(t, s.SaveReport(ctx, want))
 	got, err := s.GetReport(ctx, "r1")
 	require.NoError(t, err)
+	want.VirtualKey = store.HashVirtualKey("vk")
 	assert.Equal(t, want, got)
 	assert.NotNil(t, got.Claims[1].Evidence)
 	assert.NotNil(t, got.Claims[1].Timeline)
@@ -228,4 +232,49 @@ func TestConcurrentSavesSucceed(t *testing.T) {
 	got, err := s.ListReports(ctx, store.ListFilter{Limit: 50})
 	require.NoError(t, err)
 	assert.Len(t, got, 20)
+}
+
+func TestVirtualKeyIsStoredHashed(t *testing.T) {
+	s, path := openStore(t)
+	require.NoError(t, s.SaveReport(ctx, sampleReport("r1", time.Now().UTC())))
+	db, err := sql.Open("sqlite3", path)
+	require.NoError(t, err)
+	defer db.Close()
+	var stored string
+	require.NoError(t, db.QueryRow("SELECT virtual_key FROM reports WHERE id = 'r1'").Scan(&stored))
+	assert.Regexp(t, `^sha256:[0-9a-f]{16}$`, stored)
+	assert.Equal(t, store.HashVirtualKey("vk"), stored)
+	assert.Equal(t, "", store.HashVirtualKey(""))
+}
+
+func TestMigrationUpgradesM1Database(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "old.db")
+	script, err := os.ReadFile("migrations/001_init.sql")
+	require.NoError(t, err)
+	db, err := sql.Open("sqlite3", path)
+	require.NoError(t, err)
+	_, err = db.Exec(string(script))
+	require.NoError(t, err)
+	_, err = db.Exec("PRAGMA user_version = 1")
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO reports (id, created_at, model, provider, virtual_key, mode, status, reason, prompt,
+		answer_text, score, stale_count, checked_count, total_claims, latency_ms, credits_used)
+		VALUES ('old', '2026-11-01T00:00:00.000000000Z', 'm', 'p', '', 'async', 'complete', '', 'q', 'a', NULL, 0, 0, 0, 0, 0)`)
+	require.NoError(t, err)
+	require.NoError(t, db.Close())
+
+	s, err := store.OpenSQLite(path)
+	require.NoError(t, err)
+	defer s.Close()
+	got, err := s.GetReport(ctx, "old")
+	require.NoError(t, err)
+	assert.Equal(t, "", got.Policy)
+	assert.Equal(t, report.StatusComplete, got.Status)
+
+	db, err = sql.Open("sqlite3", path)
+	require.NoError(t, err)
+	defer db.Close()
+	var version int
+	require.NoError(t, db.QueryRow("PRAGMA user_version").Scan(&version))
+	assert.Equal(t, 2, version)
 }
