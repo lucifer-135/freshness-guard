@@ -1,0 +1,27 @@
+{
+  "client": { "enforce_auth_on_inference": false },
+  "providers": {
+    "openai": {
+      "keys": [{ "name": "fake", "value": "test-key", "models": ["*"], "weight": 1.0 }],
+      "network_config": { "base_url": "http://fakeprovider:9000", "allow_private_network": true }
+    }
+  },
+  "plugins": [
+    {
+      "enabled": true,
+      "name": "freshness-guard",
+      "path": "/app/plugins/freshness-guard.so",
+      "placement": "pre_builtin",
+      "config": {
+        "api": { "port": 8091, "token": "e2e-token" },
+        "bifrost_base_url": "http://127.0.0.1:8080",
+        "tavily_api_key": "fake-tavily-key",
+        "tavily_base_url": "http://fakeprovider:9000",
+        "models": { "extract": "openai/fake-extract", "judge": "openai/fake-judge" },
+        "fallbacks": { "extract": [], "judge": [] },
+        "daily_credit_budget": 1000,
+        "db_path": "/app/data/freshness.db"
+      }
+    }
+  ]
+}
