@@ -1,0 +1,179 @@
+package llm_test
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/lucifer-135/freshness-guard/internal/llm"
+)
+
+type recorded struct {
+	header http.Header
+	body   map[string]any
+}
+
+// fakeServer replies with the given contents in order (the last one repeats).
+type fakeServer struct {
+	mu       sync.Mutex
+	replies  []string
+	status   int
+	body     string
+	delay    time.Duration
+	requests []recorded
+}
+
+func (f *fakeServer) start(t *testing.T) *httptest.Server {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		data, _ := io.ReadAll(r.Body)
+		var body map[string]any
+		_ = json.Unmarshal(data, &body)
+		f.mu.Lock()
+		f.requests = append(f.requests, recorded{header: r.Header.Clone(), body: body})
+		n := len(f.requests)
+		f.mu.Unlock()
+		if f.delay > 0 {
+			time.Sleep(f.delay)
+		}
+		if f.status != 0 {
+			w.WriteHeader(f.status)
+			_, _ = w.Write([]byte(f.body))
+			return
+		}
+		reply := f.replies[min(n, len(f.replies))-1]
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"choices": []any{map[string]any{"message": map[string]any{"role": "assistant", "content": reply}}},
+		})
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+type out struct {
+	A int `json:"a"`
+}
+
+type validated struct {
+	A int `json:"a"`
+}
+
+func (v *validated) Validate() error {
+	if v.A == 0 {
+		return errors.New("a must not be zero")
+	}
+	return nil
+}
+
+func TestCompleteSendsHeadersAndBody(t *testing.T) {
+	f := &fakeServer{replies: []string{"hello"}}
+	srv := f.start(t)
+	got, err := llm.New(srv.URL, "vk-1").Complete(context.Background(), llm.Request{
+		Model: "groq/x", Fallbacks: []string{"gemini/y"}, System: "s", User: "u",
+		SchemaName: "claims", Schema: json.RawMessage(`{"type":"object"}`), MaxTokens: 2048,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "hello", got)
+
+	req := f.requests[0]
+	assert.Equal(t, "off", req.header.Get("x-bf-freshness"))
+	assert.Equal(t, "vk-1", req.header.Get("x-bf-vk"))
+	assert.Equal(t, "groq/x", req.body["model"])
+	assert.Equal(t, []any{"gemini/y"}, req.body["fallbacks"])
+	assert.Equal(t, 0.0, req.body["temperature"])
+	assert.Equal(t, 2048.0, req.body["max_completion_tokens"])
+	format := req.body["response_format"].(map[string]any)
+	assert.Equal(t, "json_schema", format["type"])
+	assert.Equal(t, "claims", format["json_schema"].(map[string]any)["name"])
+	messages := req.body["messages"].([]any)
+	require.Len(t, messages, 2)
+	assert.Equal(t, "system", messages[0].(map[string]any)["role"])
+	assert.Equal(t, "user", messages[1].(map[string]any)["role"])
+	assert.Equal(t, "u", messages[1].(map[string]any)["content"])
+}
+
+func TestCompleteOmitsEmptyOptionalFields(t *testing.T) {
+	f := &fakeServer{replies: []string{"hello"}}
+	srv := f.start(t)
+	_, err := llm.New(srv.URL, "").Complete(context.Background(), llm.Request{Model: "m", System: "s", User: "u"})
+	require.NoError(t, err)
+	req := f.requests[0]
+	assert.Empty(t, req.header.Get("x-bf-vk"))
+	assert.NotContains(t, req.body, "fallbacks")
+	assert.NotContains(t, req.body, "max_completion_tokens")
+	assert.NotContains(t, req.body, "response_format")
+}
+
+func TestCompleteReturnsErrorOnHTTPStatus(t *testing.T) {
+	f := &fakeServer{status: http.StatusTooManyRequests, body: "rate limited"}
+	srv := f.start(t)
+	_, err := llm.New(srv.URL, "").Complete(context.Background(), llm.Request{Model: "m"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "429")
+	assert.Contains(t, err.Error(), "rate limited")
+}
+
+func TestCompleteJSONStripsCodeFence(t *testing.T) {
+	f := &fakeServer{replies: []string{"```json\n{\"a\":1}\n```"}}
+	srv := f.start(t)
+	var o out
+	require.NoError(t, llm.New(srv.URL, "").CompleteJSON(context.Background(), llm.Request{Model: "m"}, &o))
+	assert.Equal(t, 1, o.A)
+}
+
+func TestCompleteJSONRepairsOnce(t *testing.T) {
+	f := &fakeServer{replies: []string{"not json", `{"a":1}`}}
+	srv := f.start(t)
+	var o out
+	require.NoError(t, llm.New(srv.URL, "").CompleteJSON(context.Background(), llm.Request{Model: "m", System: "s", User: "u"}, &o))
+	assert.Equal(t, 1, o.A)
+	require.Len(t, f.requests, 2)
+	messages := f.requests[1].body["messages"].([]any)
+	require.Len(t, messages, 4)
+	assert.Equal(t, "assistant", messages[2].(map[string]any)["role"])
+	assert.Equal(t, "not json", messages[2].(map[string]any)["content"])
+	assert.Contains(t, messages[3].(map[string]any)["content"], "could not be used")
+}
+
+func TestCompleteJSONFailsAfterSecondMalformed(t *testing.T) {
+	f := &fakeServer{replies: []string{"x", "x"}}
+	srv := f.start(t)
+	var o out
+	err := llm.New(srv.URL, "").CompleteJSON(context.Background(), llm.Request{Model: "m"}, &o)
+	assert.ErrorIs(t, err, llm.ErrMalformed)
+	assert.Len(t, f.requests, 2)
+}
+
+func TestCompleteJSONRunsValidator(t *testing.T) {
+	f := &fakeServer{replies: []string{`{"a":0}`, `{"a":2}`}}
+	srv := f.start(t)
+	var v validated
+	require.NoError(t, llm.New(srv.URL, "").CompleteJSON(context.Background(), llm.Request{Model: "m"}, &v))
+	assert.Equal(t, 2, v.A)
+	assert.Len(t, f.requests, 2)
+}
+
+func TestCompleteJSONDoesNotRepairHTTPErrors(t *testing.T) {
+	f := &fakeServer{status: http.StatusInternalServerError, body: "down"}
+	srv := f.start(t)
+	var o out
+	err := llm.New(srv.URL, "").CompleteJSON(context.Background(), llm.Request{Model: "m"}, &o)
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, llm.ErrMalformed)
+	assert.Len(t, f.requests, 1)
+}
+
+func TestCompleteHonoursTimeout(t *testing.T) {
+	f := &fakeServer{replies: []string{"late"}, delay: 200 * time.Millisecond}
+	srv := f.start(t)
+	_, err := llm.New(srv.URL, "").Complete(context.Background(), llm.Request{Model: "m", Timeout: 50 * time.Millisecond})
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+}
