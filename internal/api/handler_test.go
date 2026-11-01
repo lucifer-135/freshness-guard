@@ -200,3 +200,14 @@ func TestCheckValidatesText(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, do(h, http.MethodPost, "/freshness/check", "t", string(long)).Code)
 	assert.Equal(t, http.StatusBadRequest, do(h, http.MethodPost, "/freshness/check", "t", `not json`).Code)
 }
+
+func TestBearerSchemeIsCaseInsensitive(t *testing.T) {
+	h := newHandler("t", &fakeReports{reports: map[string]report.Report{"r-1": sampleReport()}}, &fakeJobs{})
+	for _, auth := range []string{"bearer t", "BEARER t", "Bearer   t"} {
+		req := httptest.NewRequest(http.MethodGet, "/freshness/reports/r-1", nil)
+		req.Header.Set("Authorization", auth)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code, auth)
+	}
+}

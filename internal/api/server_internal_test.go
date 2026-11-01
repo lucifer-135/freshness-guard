@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,4 +30,11 @@ func TestShutdownIsNotLogged(t *testing.T) {
 	require.NoError(t, s.Start())
 	require.NoError(t, s.Shutdown(context.Background()))
 	assert.NotContains(t, buf.String(), "stopped unexpectedly")
+}
+
+func TestServerTimeouts(t *testing.T) {
+	s := NewServer("127.0.0.1:0", NewHandler(Deps{}), slog.Default())
+	assert.Equal(t, 30*time.Second, s.http.ReadTimeout)
+	assert.Equal(t, 120*time.Second, s.http.IdleTimeout)
+	assert.Equal(t, time.Duration(0), s.http.WriteTimeout, "event streams must not be cut off")
 }

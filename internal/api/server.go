@@ -21,8 +21,10 @@ type Server struct {
 // NewServer creates a server that will serve handler on addr.
 func NewServer(addr string, handler http.Handler, logger *slog.Logger) *Server {
 	return &Server{
-		addr:   addr,
-		http:   &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second},
+		addr: addr,
+		http: &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second,
+			// No WriteTimeout: event streams stay open for as long as the client listens.
+			ReadTimeout: 30 * time.Second, IdleTimeout: 120 * time.Second},
 		logger: logger,
 	}
 }

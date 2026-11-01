@@ -44,6 +44,8 @@ type Deps struct {
 	Now          func() time.Time
 	CheckTimeout time.Duration
 	Logger       *slog.Logger
+	Events       Events
+	Heartbeat    time.Duration
 }
 
 type handler struct {
@@ -59,6 +61,9 @@ func NewHandler(deps Deps) http.Handler {
 	if deps.Now == nil {
 		deps.Now = time.Now
 	}
+	if deps.Heartbeat <= 0 {
+		deps.Heartbeat = DefaultHeartbeat
+	}
 	if deps.Logger == nil {
 		deps.Logger = slog.Default()
 	}
@@ -70,6 +75,7 @@ func NewHandler(deps Deps) http.Handler {
 	mux.Handle("GET /freshness/reports/{id}", protect(http.HandlerFunc(h.getReport)))
 	mux.Handle("GET /freshness/reports", protect(http.HandlerFunc(h.listReports)))
 	mux.Handle("POST /freshness/check", protect(http.HandlerFunc(h.check)))
+	mux.Handle("GET /freshness/events", protect(http.HandlerFunc(h.events)))
 	return mux
 }
 

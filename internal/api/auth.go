@@ -15,8 +15,9 @@ func requireToken(token string) func(http.Handler) http.Handler {
 				writeError(w, http.StatusServiceUnavailable, "The plugin API is disabled because api.token is not configured.")
 				return
 			}
-			given, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
-			if !ok || subtle.ConstantTimeCompare([]byte(given), []byte(token)) != 1 {
+			scheme, given, ok := strings.Cut(strings.TrimSpace(r.Header.Get("Authorization")), " ")
+			given = strings.TrimSpace(given)
+			if !ok || !strings.EqualFold(scheme, "Bearer") || subtle.ConstantTimeCompare([]byte(given), []byte(token)) != 1 {
 				w.Header().Set("WWW-Authenticate", "Bearer")
 				writeError(w, http.StatusUnauthorized, "A valid bearer token is required.")
 				return
