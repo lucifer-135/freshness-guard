@@ -13,6 +13,8 @@ import (
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/lucifer-135/freshness-guard/internal/app"
 )
 
 func freePort(t *testing.T) int {
@@ -44,6 +46,46 @@ func initWith(t *testing.T, port int, dbPath string) {
 
 func newCtx() *schemas.BifrostContext {
 	return schemas.NewBifrostContext(context.Background(), time.Now().Add(time.Minute))
+}
+
+// A reload holds mu while it swaps apps; request hooks must not wait for it.
+func TestHooksDoNotWaitForInit(t *testing.T) {
+	mu.Lock()
+	done := make(chan struct{})
+	go func() {
+		_ = HTTPTransportResponseHeadersHook(newCtx(), &schemas.HTTPRequest{}, &schemas.HTTPResponseMetadata{})
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(500 * time.Millisecond):
+		t.Error("a request hook waited for Init")
+	}
+	mu.Unlock()
+	<-done
+}
+
+// A reload frees the old API port at once but drains the old app's jobs in
+// the background, so Init returns without waiting for them.
+func TestReloadDrainsOldAppInBackground(t *testing.T) {
+	release, drained := make(chan struct{}), make(chan struct{})
+	orig := drainApp
+	drainApp = func(a *app.App) { <-release; orig(a); close(drained) }
+	defer func() { drainApp = orig }()
+
+	oldPort, newPort, db := freePort(t), freePort(t), filepath.Join(t.TempDir(), "f.db")
+	initWith(t, oldPort, db)
+	start := time.Now()
+	initWith(t, newPort, db)
+	assert.Less(t, time.Since(start), 2*time.Second)
+	assert.True(t, healthOK(newPort), "the new app serves at once")
+	assert.False(t, healthOK(oldPort), "the old port is free at once")
+
+	close(release)
+	<-drained
+	require.NoError(t, Cleanup())
+	require.NoError(t, Cleanup())
+	assert.Nil(t, getApp())
 }
 
 func TestGetName(t *testing.T) {

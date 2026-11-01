@@ -8,6 +8,7 @@ import (
 	"os"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/maximhq/bifrost/core/schemas"
@@ -24,19 +25,22 @@ const (
 
 // Bifrost reloads a plugin at runtime by calling Init again on the same loaded
 // .so before it retires the old instance, so the package state is shared and
-// Init/Cleanup calls are reference-counted.
+// Init/Cleanup calls are reference-counted. mu serializes Init and Cleanup;
+// request hooks read current without locking, so a reload never stalls them.
 var (
-	mu         sync.RWMutex
-	current    *app.App
+	mu         sync.Mutex
+	current    atomic.Pointer[app.App]
 	currentCfg config.Config
 	refs       int
 	logger     = slog.New(slog.NewJSONHandler(os.Stderr, nil)).With("plugin", pluginName)
 )
 
+// drainApp stops an app that has been replaced. It runs in the background,
+// because draining its queue can take seconds.
+var drainApp = stop
+
 func getApp() *app.App {
-	mu.RLock()
-	defer mu.RUnlock()
-	return current
+	return current.Load()
 }
 
 // Init parses the plugin config and starts the plugin, or keeps the running
@@ -51,17 +55,24 @@ func Init(raw any) error {
 	mu.Lock()
 	defer mu.Unlock()
 	refs++
-	if current != nil && reflect.DeepEqual(currentCfg, cfg) {
+	old := current.Load()
+	if old != nil && reflect.DeepEqual(currentCfg, cfg) {
 		return nil
 	}
-	if current != nil {
-		stop(current)
-		current = nil
+	if old != nil {
+		// Free the old API port now; the old jobs drain after the swap.
+		ctx, cancel := context.WithTimeout(context.Background(), stopTimeout)
+		if err := old.StopAPI(ctx); err != nil {
+			logger.Error("The old freshness-guard API server did not stop cleanly.", "error", err)
+		}
+		cancel()
+		defer func() { go drainApp(old) }()
 	}
 
 	a, err := app.New(cfg, logger)
 	if err != nil {
 		logger.Error("Freshness Guard could not start, so answers pass through unchecked.", "error", err)
+		current.Store(nil)
 		return nil
 	}
 	if err := a.Start(); err != nil {
@@ -69,7 +80,8 @@ func Init(raw any) error {
 	} else {
 		logger.Info("freshness-guard API server started", "port", cfg.APIPort)
 	}
-	current, currentCfg = a, cfg
+	currentCfg = cfg
+	current.Store(a)
 	return nil
 }
 
@@ -93,11 +105,12 @@ func Cleanup() error {
 	if refs > 0 {
 		refs--
 	}
-	if refs > 0 || current == nil {
+	if refs > 0 {
 		return nil
 	}
-	stop(current)
-	current = nil
+	if a := current.Swap(nil); a != nil {
+		stop(a)
+	}
 	return nil
 }
 

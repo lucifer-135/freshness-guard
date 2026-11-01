@@ -106,15 +106,21 @@ func (a *App) Start() error {
 	return nil
 }
 
+// StopAPI shuts down the API server, which frees its port. Calling it again
+// does nothing.
+func (a *App) StopAPI(ctx context.Context) error {
+	if !a.serverUp {
+		return nil
+	}
+	a.serverUp = false
+	apiCtx, cancel := context.WithTimeout(ctx, apiStopTimeout)
+	defer cancel()
+	return a.server.Shutdown(apiCtx)
+}
+
 // Stop shuts down the API server, drains the workers and closes the database.
 func (a *App) Stop(ctx context.Context) error {
-	var errs []error
-	if a.serverUp {
-		apiCtx, cancel := context.WithTimeout(ctx, apiStopTimeout)
-		errs = append(errs, a.server.Shutdown(apiCtx))
-		cancel()
-		a.serverUp = false
-	}
+	errs := []error{a.StopAPI(ctx)}
 	engCtx, cancel := context.WithTimeout(ctx, engineStopTimeout)
 	errs = append(errs, a.engine.Stop(engCtx))
 	cancel()
