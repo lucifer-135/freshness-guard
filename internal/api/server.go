@@ -11,18 +11,6 @@ import (
 	"time"
 )
 
-// Deps holds what the API handlers need.
-type Deps struct {
-	Token string
-}
-
-// NewHandler returns the plugin API's request handler.
-func NewHandler(deps Deps) http.Handler {
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /freshness/health", handleHealth)
-	return mux
-}
-
 // Server is the plugin's HTTP API server.
 type Server struct {
 	addr   string
