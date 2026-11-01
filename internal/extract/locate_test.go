@@ -39,3 +39,9 @@ func TestLocateNotFound(t *testing.T) {
 	assertSpan(t, -1, -1, false, answer, "costs $30")
 	assertSpan(t, -1, -1, false, answer, "")
 }
+
+func TestLocateHandlesInvalidUTF8(t *testing.T) {
+	assert.NotPanics(t, func() {
+		assertSpan(t, 0, 10, true, "costs $20\xff", "COSTS $20�")
+	})
+}

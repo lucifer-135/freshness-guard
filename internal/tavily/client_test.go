@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -177,4 +178,12 @@ func TestCost(t *testing.T) {
 	assert.Equal(t, 1, Cost("basic"))
 	assert.Equal(t, 1, Cost(""))
 	assert.Equal(t, 2, Cost("advanced"))
+}
+
+func TestSearchRejectsHugeReply(t *testing.T) {
+	f := &fakeTavily{results: []map[string]any{{"title": "A", "url": "https://a", "content": strings.Repeat("a", 5<<20)}}}
+	c, _ := newTestClient(f.start(t).URL, fixedNow)
+	_, err := c.Search(context.Background(), SearchRequest{Query: "q"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "too large")
 }

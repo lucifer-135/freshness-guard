@@ -45,10 +45,8 @@ type normalized struct {
 func normalize(s string) normalized {
 	var n normalized
 	for i, r := range s {
-		size := utf8.RuneLen(r)
-		if size < 0 {
-			size = 1
-		}
+		// An invalid byte decodes as RuneError but is one byte wide.
+		_, size := utf8.DecodeRuneInString(s[i:])
 		if unicode.IsSpace(r) {
 			if last := len(n.runes) - 1; last >= 0 && n.runes[last] == ' ' {
 				n.ends[last] = i + size

@@ -22,6 +22,9 @@ const HeaderFreshness = "x-bf-freshness"
 // repair attempt.
 var ErrMalformed = errors.New("the model reply is not valid JSON for the schema")
 
+// MaxResponseBytes limits how much of a reply is read.
+const MaxResponseBytes = 4 << 20
+
 // Request is one chat completion with a system and a user message.
 type Request struct {
 	Model      string
@@ -176,9 +179,12 @@ func (c *Client) send(ctx context.Context, req Request, messages []message) (str
 		return "", fmt.Errorf("call %s: %w", req.Model, err)
 	}
 	defer resp.Body.Close()
-	payload, err := io.ReadAll(resp.Body)
+	payload, err := io.ReadAll(io.LimitReader(resp.Body, MaxResponseBytes+1))
 	if err != nil {
 		return "", fmt.Errorf("read reply from %s: %w", req.Model, err)
+	}
+	if len(payload) > MaxResponseBytes {
+		return "", fmt.Errorf("the reply from %s is too large (more than %d bytes)", req.Model, MaxResponseBytes)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		excerpt := payload

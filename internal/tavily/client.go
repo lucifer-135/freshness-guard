@@ -29,6 +29,8 @@ const (
 	AttemptTimeout = 5 * time.Second
 	// MaxRetries is the number of retries after HTTP 429.
 	MaxRetries = 3
+	// MaxResponseBytes limits how much of a reply is read.
+	MaxResponseBytes = 4 << 20
 
 	maxWait = 10 * time.Second
 )
@@ -183,9 +185,12 @@ func (c *Client) attempt(ctx context.Context, data []byte) (status int, retryAft
 		return 0, "", nil, fmt.Errorf("tavily: %w", err)
 	}
 	defer resp.Body.Close()
-	payload, err = io.ReadAll(resp.Body)
+	payload, err = io.ReadAll(io.LimitReader(resp.Body, MaxResponseBytes+1))
 	if err != nil {
 		return 0, "", nil, fmt.Errorf("tavily: read reply: %w", err)
+	}
+	if len(payload) > MaxResponseBytes {
+		return 0, "", nil, fmt.Errorf("tavily: the reply is too large (more than %d bytes)", MaxResponseBytes)
 	}
 	return resp.StatusCode, resp.Header.Get("Retry-After"), payload, nil
 }

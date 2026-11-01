@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -176,4 +177,12 @@ func TestCompleteHonoursTimeout(t *testing.T) {
 	srv := f.start(t)
 	_, err := llm.New(srv.URL, "").Complete(context.Background(), llm.Request{Model: "m", Timeout: 50 * time.Millisecond})
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
+}
+
+func TestCompleteRejectsHugeReply(t *testing.T) {
+	f := &fakeServer{replies: []string{strings.Repeat("a", 5<<20)}}
+	srv := f.start(t)
+	_, err := llm.New(srv.URL, "").Complete(context.Background(), llm.Request{Model: "m"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "too large")
 }
