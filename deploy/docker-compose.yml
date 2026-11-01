@@ -1,5 +1,13 @@
 name: freshness-guard
 
+x-bifrost-build: &bifrost-build
+  context: ..
+  dockerfile: deploy/Dockerfile
+  target: runtime
+  additional_contexts:
+    # .cache/bifrost-src is created by "bash deploy/fetch-bifrost.sh". Run it once after cloning.
+    bifrost-src: ../.cache/bifrost-src
+
 services:
   gotest:
     image: golang:1.27.3-trixie
@@ -12,12 +20,7 @@ services:
     profiles: ["tools"]
 
   bifrost:
-    build:
-      context: ..
-      dockerfile: deploy/Dockerfile
-      target: runtime
-      additional_contexts:
-        bifrost-src: ../.cache/bifrost-src
+    build: *bifrost-build
     # Published on localhost only: the dev config.json turns off inference auth,
     # and .env holds real provider keys.
     ports: ["127.0.0.1:8080:8080", "127.0.0.1:8090:8090"]
@@ -27,7 +30,19 @@ services:
     volumes:
       - bifrost-data:/app/data
       - ./config.json:/app/data/config.json:ro
-    depends_on: [fakeprovider]
+    depends_on:
+      fakeprovider:
+        condition: service_healthy
+
+  # Bifrost with test/e2e/config.json: fake models, fake Tavily, plugin API on 8091.
+  bifrost-e2e:
+    build: *bifrost-build
+    volumes:
+      - ../test/e2e/config.json:/app/data/config.json:ro
+    depends_on:
+      fakeprovider:
+        condition: service_healthy
+    profiles: ["tools"]
 
   fakeprovider:
     image: golang:1.27.3-trixie
@@ -37,6 +52,12 @@ services:
       - gomodcache:/go/pkg/mod
       - gobuildcache:/root/.cache/go-build
     command: ["go", "run", "./test/fakeprovider"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 60s
 
   e2e:
     image: golang:1.27.3-trixie
@@ -46,10 +67,11 @@ services:
       - gomodcache:/go/pkg/mod
       - gobuildcache:/root/.cache/go-build
     environment:
-      BIFROST_URL: http://bifrost:8080
-      FG_URL: http://bifrost:8090
+      BIFROST_URL: http://bifrost-e2e:8080
+      FG_URL: http://bifrost-e2e:8091
+      FG_TOKEN: e2e-token
     command: ["go", "test", "-tags", "e2e", "-count=1", "-v", "./test/e2e/..."]
-    depends_on: [bifrost]
+    depends_on: [bifrost-e2e]
     profiles: ["tools"]
 
 volumes:

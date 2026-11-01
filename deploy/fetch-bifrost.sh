@@ -7,8 +7,10 @@ set -euo pipefail
 TAG="${BIFROST_TAG:-transports/v2.4.0}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DEST="$ROOT/.cache/bifrost-src"
+# Written as the last step, so an interrupted run is fetched again.
+MARKER="$DEST/.fetch-complete"
 
-if [ -d "$DEST/.git" ] && [ "$(git -C "$DEST" describe --tags --exact-match 2>/dev/null)" = "$TAG" ]; then
+if [ -f "$MARKER" ] && [ "$(cat "$MARKER")" = "$TAG" ]; then
   echo "Bifrost $TAG is already in $DEST"
   exit 0
 fi
@@ -24,4 +26,5 @@ git -C "$DEST" sparse-checkout set transports ui
 # Rewrite files checked out before the settings above took effect.
 git -C "$DEST" rm -rq --cached .
 git -C "$DEST" reset -q --hard
+echo "$TAG" > "$MARKER"
 echo "Bifrost $TAG checked out in $DEST"

@@ -16,7 +16,7 @@ web/dist/
 .cache/
 
 # Runtime data
-data/
+/data/
 *.db
 *.db-wal
 *.db-shm
