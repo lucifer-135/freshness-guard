@@ -5,27 +5,131 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 )
 
-const defaultAPIPort = 8090
+const (
+	defaultAPIPort     = 8090
+	defaultBifrostPort = 8080
+)
+
+// VirtualKey holds the per-virtual-key settings.
+type VirtualKey struct {
+	Mode       string
+	SampleRate float64
+}
 
 // Config is the validated plugin configuration.
 type Config struct {
-	APIPort  int
-	APIToken string
-}
+	APIHost, APIToken string
+	APIPort           int
 
-type rawConfig struct {
-	API struct {
-		Port  *int   `json:"port"`
-		Token string `json:"token"`
-	} `json:"api"`
+	BifrostBaseURL    string
+	BifrostVirtualKey string
+
+	TavilyAPIKey, TavilyBaseURL string
+
+	DefaultMode string
+
+	ExtractModel, JudgeModel         string
+	ExtractFallbacks, JudgeFallbacks []string
+
+	ModelCutoffs map[string]time.Time
+
+	RiskThreshold                                    float64
+	MaxClaims, Workers, QueueSize, DailyCreditBudget int
+
+	DBPath string
+
+	VirtualKeys map[string]VirtualKey
 }
 
 // Default returns the configuration used when no valid value is given.
 func Default() Config {
-	return Config{APIPort: defaultAPIPort}
+	return Config{
+		APIHost:           "0.0.0.0",
+		APIPort:           defaultAPIPort,
+		BifrostBaseURL:    "http://127.0.0.1:8080",
+		TavilyBaseURL:     "https://api.tavily.com",
+		DefaultMode:       "async",
+		ExtractModel:      "groq/openai/gpt-oss-20b",
+		JudgeModel:        "groq/openai/gpt-oss-120b",
+		ExtractFallbacks:  []string{"gemini/gemini-3.5-flash-lite"},
+		JudgeFallbacks:    []string{"gemini/gemini-3.5-flash"},
+		RiskThreshold:     0.3,
+		MaxClaims:         12,
+		Workers:           4,
+		QueueSize:         256,
+		DailyCreditBudget: 30,
+		DBPath:            "/app/data/freshness.db",
+	}
+}
+
+type object = map[string]json.RawMessage
+
+// parser collects warnings while each field is decoded on its own, so that one
+// bad field does not reset the others.
+type parser struct {
+	warnings []string
+}
+
+func (p *parser) warn(format string, args ...any) {
+	p.warnings = append(p.warnings, fmt.Sprintf(format, args...))
+}
+
+// decode reads obj[key] into dst. It returns false when the key is absent or
+// has the wrong type; dst is unchanged in both cases.
+func decode[T any](p *parser, obj object, path, key string, dst *T) bool {
+	raw, ok := obj[key]
+	if !ok {
+		return false
+	}
+	var v T
+	if err := json.Unmarshal(raw, &v); err != nil {
+		p.warn("plugin config field %q has the wrong type, so the default is used: %v", path+key, err)
+		return false
+	}
+	*dst = v
+	return true
+}
+
+// str reads a string field, resolves an env. reference, and keeps the default
+// when required is true and the result is empty.
+func (p *parser) str(obj object, path, key string, dst *string, required bool) {
+	var v string
+	if !decode(p, obj, path, key, &v) {
+		return
+	}
+	if name, ok := strings.CutPrefix(v, "env."); ok {
+		v = os.Getenv(name)
+		if v == "" {
+			p.warn("plugin config field %q refers to environment variable %s, which is empty", path+key, name)
+		}
+	} else if v == "" && required {
+		p.warn("plugin config field %q must not be empty, so the default is used", path+key)
+	}
+	if v == "" && required {
+		return
+	}
+	*dst = v
+}
+
+func (p *parser) intRange(obj object, key string, dst *int, lo, hi int) {
+	var v int
+	if !decode(p, obj, "", key, &v) {
+		return
+	}
+	if v < lo || v > hi {
+		p.warn("%s %d is outside %d-%d, so the default %d is used", key, v, lo, hi, *dst)
+		return
+	}
+	*dst = v
+}
+
+func validMode(m string) bool {
+	return m == "async" || m == "sync" || m == "off"
 }
 
 // Parse converts the raw plugin config into a Config. It never fails: invalid
@@ -36,26 +140,153 @@ func Parse(raw any) (Config, []string) {
 		return cfg, nil
 	}
 
-	var parsed rawConfig
+	var obj object
 	data, err := json.Marshal(raw)
 	if err == nil {
-		err = json.Unmarshal(data, &parsed)
+		err = json.Unmarshal(data, &obj)
 	}
 	if err != nil {
 		return Default(), []string{fmt.Sprintf("plugin config is not a valid object, using defaults: %v", err)}
 	}
 
-	var warnings []string
-	if parsed.API.Port != nil {
-		port := *parsed.API.Port
-		if port >= 1 && port <= 65535 {
-			cfg.APIPort = port
+	p := &parser{}
+	p.parseAPI(obj, &cfg)
+
+	p.str(obj, "", "bifrost_base_url", &cfg.BifrostBaseURL, true)
+	p.str(obj, "", "bifrost_virtual_key", &cfg.BifrostVirtualKey, false)
+	p.str(obj, "", "tavily_api_key", &cfg.TavilyAPIKey, false)
+	p.str(obj, "", "tavily_base_url", &cfg.TavilyBaseURL, true)
+	p.str(obj, "", "db_path", &cfg.DBPath, true)
+
+	var mode string
+	if decode(p, obj, "", "default_mode", &mode) {
+		if validMode(mode) {
+			cfg.DefaultMode = mode
 		} else {
-			warnings = append(warnings, fmt.Sprintf("api.port %d is outside 1-65535, using %d", port, defaultAPIPort))
+			p.warn("default_mode %q is not async, sync or off, so %q is used", mode, cfg.DefaultMode)
 		}
 	}
-	cfg.APIToken = ResolveEnv(parsed.API.Token)
-	return cfg, warnings
+
+	var models object
+	if decode(p, obj, "", "models", &models) {
+		p.str(models, "models.", "extract", &cfg.ExtractModel, true)
+		p.str(models, "models.", "judge", &cfg.JudgeModel, true)
+	}
+	var fallbacks object
+	if decode(p, obj, "", "fallbacks", &fallbacks) {
+		decode(p, fallbacks, "fallbacks.", "extract", &cfg.ExtractFallbacks)
+		decode(p, fallbacks, "fallbacks.", "judge", &cfg.JudgeFallbacks)
+	}
+
+	var threshold float64
+	if decode(p, obj, "", "risk_threshold", &threshold) {
+		if threshold > 0 && threshold <= 1 {
+			cfg.RiskThreshold = threshold
+		} else {
+			p.warn("risk_threshold %v must be greater than 0 and at most 1, so the default %v is used", threshold, cfg.RiskThreshold)
+		}
+	}
+	p.intRange(obj, "max_claims", &cfg.MaxClaims, 1, 50)
+	p.intRange(obj, "workers", &cfg.Workers, 1, 64)
+	p.intRange(obj, "queue_size", &cfg.QueueSize, 1, 10000)
+	p.intRange(obj, "daily_credit_budget", &cfg.DailyCreditBudget, 0, 100000)
+
+	p.parseCutoffs(obj, &cfg)
+	p.parseVirtualKeys(obj, &cfg)
+	return cfg, p.warnings
+}
+
+func (p *parser) parseAPI(obj object, cfg *Config) {
+	var api object
+	if !decode(p, obj, "", "api", &api) {
+		return
+	}
+	p.str(api, "api.", "host", &cfg.APIHost, true)
+	p.str(api, "api.", "token", &cfg.APIToken, false)
+
+	var port int
+	if !decode(p, api, "api.", "port", &port) {
+		return
+	}
+	switch bifrostPort := BifrostPort(os.Args); {
+	case port < 1 || port > 65535:
+		p.warn("api.port %d is outside 1-65535, using %d", port, defaultAPIPort)
+	case port == bifrostPort:
+		p.warn("api.port %d is Bifrost's own port, so %d is used instead", port, defaultAPIPort)
+	default:
+		cfg.APIPort = port
+	}
+}
+
+func (p *parser) parseCutoffs(obj object, cfg *Config) {
+	var cutoffs map[string]string
+	if !decode(p, obj, "", "model_cutoffs", &cutoffs) {
+		return
+	}
+	cfg.ModelCutoffs = make(map[string]time.Time, len(cutoffs))
+	for model, value := range cutoffs {
+		t, err := time.Parse("2006-01-02", value)
+		if err != nil {
+			t, err = time.Parse("2006-01", value)
+		}
+		if err != nil {
+			p.warn("model_cutoffs entry %q has the date %q, which is not YYYY-MM or YYYY-MM-DD, so it is ignored", model, value)
+			continue
+		}
+		cfg.ModelCutoffs[model] = t.UTC()
+	}
+}
+
+func (p *parser) parseVirtualKeys(obj object, cfg *Config) {
+	var keys object
+	if !decode(p, obj, "", "virtual_keys", &keys) {
+		return
+	}
+	cfg.VirtualKeys = make(map[string]VirtualKey, len(keys))
+	for key, raw := range keys {
+		var entry struct {
+			Mode       string   `json:"mode"`
+			SampleRate *float64 `json:"sample_rate"`
+		}
+		if err := json.Unmarshal(raw, &entry); err != nil {
+			p.warn("virtual_keys entry %q has the wrong type, so it is ignored: %v", key, err)
+			continue
+		}
+		if !validMode(entry.Mode) {
+			p.warn("virtual_keys entry %q has mode %q, which is not async, sync or off, so it is ignored", key, entry.Mode)
+			continue
+		}
+		rate := 1.0
+		if entry.SampleRate != nil {
+			rate = *entry.SampleRate
+		}
+		if rate < 0 || rate > 1 {
+			p.warn("virtual_keys entry %q has sample_rate %v, which is outside 0-1, so it is ignored", key, rate)
+			continue
+		}
+		cfg.VirtualKeys[key] = VirtualKey{Mode: entry.Mode, SampleRate: rate}
+	}
+}
+
+// BifrostPort returns the port Bifrost listens on, read from its command-line
+// arguments (-port N, --port N, -port=N or --port=N). The default is 8080.
+func BifrostPort(args []string) int {
+	for i, arg := range args {
+		name, value, hasValue := strings.Cut(arg, "=")
+		if name != "-port" && name != "--port" {
+			continue
+		}
+		if !hasValue {
+			if i+1 >= len(args) {
+				break
+			}
+			value = args[i+1]
+		}
+		if port, err := strconv.Atoi(value); err == nil {
+			return port
+		}
+	}
+	return defaultBifrostPort
 }
 
 // ResolveEnv returns the value of environment variable X for "env.X", and the
