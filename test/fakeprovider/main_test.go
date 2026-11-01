@@ -16,7 +16,9 @@ func TestChatCompletionNonStreaming(t *testing.T) {
 	body := `{"model":"fake-model","messages":[{"role":"user","content":"hi"}]}`
 	newHandler().ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(body)))
 	assert.Equal(t, http.StatusOK, rec.Code)
-	var resp struct{ Choices []struct{ Message struct{ Content string } } }
+	var resp struct {
+		Choices []struct{ Message struct{ Content string } }
+	}
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 	assert.Equal(t, Answer, resp.Choices[0].Message.Content)
 }
