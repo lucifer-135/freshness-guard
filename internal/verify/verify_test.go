@@ -184,6 +184,17 @@ func TestVerifySearchesJudgesAndMapsResults(t *testing.T) {
 	assert.Equal(t, testClaims()[2], claims[2])
 }
 
+// The live run showed WRONG verdicts with an empty current value, which leaves
+// nothing to show, store or heal with.
+func TestJudgePromptAsksForCurrentValueOnEveryVerdict(t *testing.T) {
+	c := &fakeCompleter{replies: []string{judgeBoth}}
+	_, _, err := newVerifier(&fakeSearcher{responses: basicResponses()}, c, &fakeSpender{}).Verify(context.Background(), testClaims())
+	require.NoError(t, err)
+	system := c.requests[0].System
+	assert.Contains(t, system, `For FRESH, STALE and WRONG, "current_value" is the value that holds today according to the evidence`)
+	assert.Contains(t, system, "Use WRONG only when the evidence shows that the claimed value never held")
+}
+
 func TestVerifyTruncatesSnippets(t *testing.T) {
 	responses := basicResponses()
 	r := responses[searchKey{"basic", "price q"}]

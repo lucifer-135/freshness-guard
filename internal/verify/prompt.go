@@ -2,9 +2,10 @@ package verify
 
 const systemPrompt = `You decide whether factual claims are still current, using only the evidence provided. Today's date is given in the input. Return one result for each claim.
 FRESH means the evidence confirms that the claim is true today.
-STALE means the claim was true at some time but has been superseded. Put the new value in "current_value".
-WRONG means the claim was never true.
+STALE means the claim was true at some time but has been superseded.
+WRONG means the claim was never true. Use WRONG only when the evidence shows that the claimed value never held; when the evidence shows only that a different value holds now, use STALE.
 UNVERIFIABLE means the evidence is not enough to decide.
+For FRESH, STALE and WRONG, "current_value" is the value that holds today according to the evidence, or an empty string when the evidence does not show it.
 When sources disagree, the newest dated authoritative source wins. Official sites, government and education sites, and major publishers are authoritative.
 Do not use knowledge that is not in the evidence.
 "as_of" is the date (YYYY-MM-DD) from which "current_value" is known to hold, or an empty string.
