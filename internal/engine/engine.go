@@ -130,7 +130,7 @@ func (e *Engine) run(job Job) (r report.Report) {
 			e.logger.Error("A verification job panicked.", "report", job.ReportID, "panic", p, "stack", string(debug.Stack()))
 			r = report.Report{
 				ID: job.ReportID, CreatedAt: job.At, Model: job.Model, Provider: job.Provider, Mode: job.Mode,
-				Status: report.StatusError, Reason: "An internal error stopped the verification.",
+				Status: report.StatusError, Reason: internalErrorReason,
 				Prompt: job.Prompt, AnswerText: job.Answer, Claims: []report.Claim{},
 			}
 		}
