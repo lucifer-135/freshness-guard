@@ -390,3 +390,34 @@ func TestRunFillsExplanations(t *testing.T) {
 		Run(context.Background(), baseJob)
 	assert.Nil(t, stale.Claims[0].ScoreParts)
 }
+
+// The event stream marshals event data in another goroutine, so the claims in
+// report.claims must not be the slice the pipeline keeps writing to.
+func TestRunPublishedClaimsAreASnapshot(t *testing.T) {
+	pub := &fakePublisher{}
+	p := newPipeline(&fakeExtractor{claims: twoClaims()}, &fakeVerifier{}, &fakeFacts{}, &fakeReports{}, 0)
+	p.Events = pub
+	r := p.Run(context.Background(), baseJob)
+	require.NotNil(t, r.Claims[0].Score, "the report's claim is scored")
+	var published []report.Claim
+	for _, e := range pub.events {
+		if e.Type == events.TypeReportClaims {
+			published = e.Data.(map[string]any)["claims"].([]report.Claim)
+		}
+	}
+	require.Len(t, published, 2)
+	assert.Nil(t, published[0].Score, "scoring after publishing must not change the published claims")
+}
+
+func TestRunBlocksOnlySyncRequests(t *testing.T) {
+	v := &fakeVerifier{edit: func(c []report.Claim) []report.Claim {
+		c = markStale(c)
+		c[0].Confidence = 0.9
+		return c
+	}}
+	p := newPipeline(&fakeExtractor{claims: twoClaims()}, v, &fakeFacts{}, &fakeReports{}, 30)
+	p.BlockConfidence = 0.7
+	job := baseJob
+	job.Mode, job.Policy = "async", "block"
+	assert.False(t, p.Run(context.Background(), job).Blocked, "async answers are never blocked")
+}

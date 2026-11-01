@@ -140,7 +140,9 @@ func (p *Pipeline) run(ctx context.Context, job Job, r report.Report) report.Rep
 			c.Rationale = budgetReason
 		}
 	}
-	p.publish(events.TypeReportClaims, r.ID, map[string]any{"claims": claims})
+	// A copy: subscribers marshal the data later, while the pipeline goes on
+	// scoring these claims.
+	p.publish(events.TypeReportClaims, r.ID, map[string]any{"claims": append([]report.Claim(nil), claims...)})
 
 	if anyChecked(claims) {
 		verified, credits, err := p.Verify.Verify(ctx, claims)
@@ -197,7 +199,8 @@ func (p *Pipeline) run(ctx context.Context, job Job, r report.Report) report.Rep
 		}
 		if c.Verdict == report.VerdictStale || c.Verdict == report.VerdictWrong {
 			r.StaleCount++
-			if job.Policy == "block" && c.Confidence >= p.BlockConfidence {
+			// Only a sync request can be blocked; async answers are already delivered.
+			if job.Mode == "sync" && job.Policy == "block" && c.Confidence >= p.BlockConfidence {
 				r.Blocked = true
 			}
 		}
