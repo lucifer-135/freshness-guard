@@ -15,8 +15,10 @@ const MaxOutsideChangeRatio = 0.10
 // (UTF-16 offsets into original). It returns whether the edit is acceptable
 // and the share of characters outside the spans that were changed. Each run
 // of adjacent deletions and insertions counts as max(deleted, inserted), so a
-// replaced character counts once.
-func Guard(original, edited string, spans [][2]int) (ok bool, ratio float64) {
+// replaced character counts once. Text inserted inside or at the edge of span
+// i is free only up to allowances[i] characters (the new value's length); the
+// rest counts as changed outside, so an added explanation is caught.
+func Guard(original, edited string, spans [][2]int, allowances []int) (ok bool, ratio float64) {
 	runeSpans := toRuneSpans(original, spans)
 	inSpan := func(pos int) bool {
 		for _, s := range runeSpans {
@@ -26,14 +28,16 @@ func Guard(original, edited string, spans [][2]int) (ok bool, ratio float64) {
 		}
 		return false
 	}
+	remaining := make([]int, len(runeSpans))
+	copy(remaining, allowances)
 	// An insertion right at a span boundary belongs to the span.
-	insertInSpan := func(pos int) bool {
-		for _, s := range runeSpans {
+	spanForInsert := func(pos int) int {
+		for i, s := range runeSpans {
 			if pos >= s[0] && pos <= s[1] {
-				return true
+				return i
 			}
 		}
-		return false
+		return -1
 	}
 
 	total := utf8.RuneCountInString(original)
@@ -63,7 +67,11 @@ func Guard(original, edited string, spans [][2]int) (ok bool, ratio float64) {
 			}
 			pos += n
 		case diffmatchpatch.DiffInsert:
-			if !insertInSpan(pos) {
+			if i := spanForInsert(pos); i >= 0 {
+				free := min(n, max(remaining[i], 0))
+				remaining[i] -= free
+				inserted += n - free
+			} else {
 				inserted += n
 			}
 		}

@@ -6,7 +6,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/lucifer-135/freshness-guard/internal/llm"
 	"github.com/lucifer-135/freshness-guard/internal/report"
@@ -43,6 +45,17 @@ func Corrections(claims []report.Claim) []report.Claim {
 	return out
 }
 
+// containsAll reports whether text carries every correction's current value,
+// so an unchanged or partly corrected reply is not counted as a correction.
+func containsAll(text string, fixes []report.Claim) bool {
+	for _, c := range fixes {
+		if !strings.Contains(text, c.CurrentValue) {
+			return false
+		}
+	}
+	return true
+}
+
 type correction struct {
 	Quote        string `json:"quote"`
 	Value        string `json:"value"`
@@ -76,10 +89,12 @@ func (h *Healer) Heal(ctx context.Context, answer string, claims []report.Claim)
 		Corrections []correction `json:"corrections"`
 	}{Answer: answer}
 	spans := make([][2]int, 0, len(fixes))
+	allowances := make([]int, 0, len(fixes))
 	for _, c := range fixes {
 		payload.Corrections = append(payload.Corrections,
 			correction{Quote: c.Quote, Value: c.Value, CurrentValue: c.CurrentValue, AsOf: c.AsOf})
 		spans = append(spans, [2]int{c.SpanStart, c.SpanEnd})
+		allowances = append(allowances, utf8.RuneCountInString(c.CurrentValue))
 	}
 	user, err := json.Marshal(payload)
 	if err != nil {
@@ -91,8 +106,8 @@ func (h *Healer) Heal(ctx context.Context, answer string, claims []report.Claim)
 		Model: h.Model, Fallbacks: h.Fallbacks, System: systemPrompt, User: string(user),
 		SchemaName: "healed_answer", Schema: json.RawMessage(schema), MaxTokens: MaxTokens, Timeout: Timeout,
 	}, &out)
-	if err == nil {
-		if ok, _ := Guard(answer, out.Text, spans); ok {
+	if err == nil && out.Text != answer && containsAll(out.Text, fixes) {
+		if ok, _ := Guard(answer, out.Text, spans, allowances); ok {
 			return out.Text, len(fixes), nil
 		}
 	}

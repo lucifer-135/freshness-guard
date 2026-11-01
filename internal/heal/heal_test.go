@@ -116,3 +116,21 @@ func TestHealNothingToCorrect(t *testing.T) {
 	assert.Equal(t, 0, healed)
 	assert.Empty(t, c.requests)
 }
+
+func TestHealFallsBackWhenModelEchoesAnswer(t *testing.T) {
+	c := &fakeCompleter{reply: replyWith(answer)}
+	text, healed, err := newHealer(c).Heal(context.Background(), answer, []report.Claim{staleClaim()})
+	require.NoError(t, err)
+	assert.Equal(t, heal.Annotate(answer, []report.Claim{staleClaim()}), text)
+	assert.Equal(t, 1, healed)
+}
+
+func TestHealFallsBackWhenACorrectionIsMissing(t *testing.T) {
+	version := report.Claim{ID: "c2", Quote: "4.2", SpanStart: 66, SpanEnd: 69, Value: "4.2",
+		Verdict: report.VerdictStale, CurrentValue: "4.3"}
+	claims := []report.Claim{staleClaim(), version}
+	c := &fakeCompleter{reply: replyWith(strings.Replace(answer, "$20", "$25", 1))} // fixes only the price
+	text, _, err := newHealer(c).Heal(context.Background(), answer, claims)
+	require.NoError(t, err)
+	assert.Equal(t, heal.Annotate(answer, claims), text)
+}
