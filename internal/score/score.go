@@ -34,6 +34,19 @@ func Claim(c report.Claim, now time.Time) *int {
 }
 
 func freshScore(c report.Claim, now time.Time) float64 {
+	p := Explain(c, now)
+	return 60 + 40*p.Recency*p.Authority*p.Agreement
+}
+
+// Explain returns the factors of a FRESH claim's score, and nil for every
+// other verdict. Recency comes from the newest dated supporting source (0.5
+// when none is dated, 1 for facts that never change), authority is the
+// highest among supporting sources (0.5 without support), and agreement is
+// min(1, supporting sources / 2).
+func Explain(c report.Claim, now time.Time) *report.ScoreParts {
+	if c.Verdict != report.VerdictFresh {
+		return nil
+	}
 	var (
 		supporting int
 		authority  float64
@@ -50,7 +63,7 @@ func freshScore(c report.Claim, now time.Time) float64 {
 		}
 	}
 	if supporting == 0 {
-		return 60
+		authority = 0.5
 	}
 
 	recency := 0.5
@@ -60,8 +73,7 @@ func freshScore(c report.Claim, now time.Time) float64 {
 		age := max(now.Sub(*newest), 0)
 		recency = math.Pow(0.5, float64(age)/float64(hl))
 	}
-	agreement := min(1, float64(supporting)/2)
-	return 60 + 40*recency*authority*agreement
+	return &report.ScoreParts{Recency: recency, Authority: authority, Agreement: min(1, float64(supporting)/2)}
 }
 
 // Answer returns the mean of the scored claims weighted by P(changed), the

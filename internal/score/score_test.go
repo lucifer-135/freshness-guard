@@ -92,3 +92,19 @@ func TestAnswerNilWithoutScores(t *testing.T) {
 	assert.Nil(t, score.Answer([]report.Claim{{PChanged: 0.5}}))
 	assert.Nil(t, score.Answer(nil))
 }
+
+func TestExplainFresh(t *testing.T) {
+	c := fresh(ev(report.StanceSupports, 0.5, at(now.Add(-60*24*time.Hour))))
+	assert.Equal(t, &report.ScoreParts{Recency: 0.5, Authority: 0.5, Agreement: 0.5}, score.Explain(c, now))
+}
+
+func TestExplainFreshWithoutSupport(t *testing.T) {
+	c := fresh(ev(report.StanceNeutral, 1, at(now)))
+	assert.Equal(t, &report.ScoreParts{Recency: 0.5, Authority: 0.5, Agreement: 0}, score.Explain(c, now))
+}
+
+func TestExplainOtherVerdictsIsNil(t *testing.T) {
+	for _, v := range []report.Verdict{report.VerdictStale, report.VerdictUnverifiable, report.VerdictNotChecked} {
+		assert.Nil(t, score.Explain(report.Claim{Verdict: v, PChanged: 0.5}, now), v)
+	}
+}
