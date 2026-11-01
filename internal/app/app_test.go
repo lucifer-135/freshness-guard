@@ -21,6 +21,7 @@ import (
 	"github.com/lucifer-135/freshness-guard/internal/app"
 	"github.com/lucifer-135/freshness-guard/internal/config"
 	"github.com/lucifer-135/freshness-guard/internal/report"
+	"github.com/lucifer-135/freshness-guard/internal/store"
 )
 
 const answer = "Example Cloud Pro costs $20 per month, and its current version is 4.2."
@@ -147,6 +148,26 @@ func TestAppChecksTextEndToEnd(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	assert.NoError(t, a.Stop(ctx))
+}
+
+func TestNewFailsLeftoverPendingReports(t *testing.T) {
+	cfg := testConfig(t)
+	st, err := store.OpenSQLite(cfg.DBPath)
+	require.NoError(t, err)
+	require.NoError(t, st.SaveReport(context.Background(), report.Report{ID: "r-old", CreatedAt: time.Now(), Status: report.StatusPending}))
+	require.NoError(t, st.Close())
+
+	a, err := app.New(cfg, slog.Default())
+	require.NoError(t, err)
+	defer a.Stop(context.Background())
+
+	st, err = store.OpenSQLite(cfg.DBPath)
+	require.NoError(t, err)
+	defer st.Close()
+	got, err := st.GetReport(context.Background(), "r-old")
+	require.NoError(t, err)
+	assert.Equal(t, report.StatusError, got.Status)
+	assert.Equal(t, "The gateway stopped before verification finished.", got.Reason)
 }
 
 func TestNewFailsWhenDatabaseCannotOpen(t *testing.T) {

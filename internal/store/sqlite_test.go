@@ -177,6 +177,26 @@ func TestUpsertFactAndTimeline(t *testing.T) {
 	assert.Equal(t, "$25", rep.Claims[0].Timeline[1].Value)
 }
 
+func TestFailPendingMarksLeftoverReports(t *testing.T) {
+	s, _ := openStore(t)
+	pending := sampleReport("r-pending", time.Now().UTC())
+	pending.Status = report.StatusPending
+	require.NoError(t, s.SaveReport(ctx, pending))
+	require.NoError(t, s.SaveReport(ctx, sampleReport("r-done", time.Now().UTC())))
+
+	n, err := s.FailPending(ctx, "The gateway stopped before verification finished.")
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), n)
+
+	got, err := s.GetReport(ctx, "r-pending")
+	require.NoError(t, err)
+	assert.Equal(t, report.StatusError, got.Status)
+	assert.Equal(t, "The gateway stopped before verification finished.", got.Reason)
+	done, err := s.GetReport(ctx, "r-done")
+	require.NoError(t, err)
+	assert.Equal(t, report.StatusComplete, done.Status)
+}
+
 func TestCreditsLedger(t *testing.T) {
 	s, _ := openStore(t)
 	used, err := s.CreditsUsed(ctx, "2026-11-03")

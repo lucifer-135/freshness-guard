@@ -48,6 +48,8 @@ type Store interface {
 	UpsertFact(ctx context.Context, f report.Fact) (int64, error)
 	// AddTimeline stores timeline entries for a fact; duplicates are ignored.
 	AddTimeline(ctx context.Context, factID int64, entries []report.TimelineEntry) error
+	// FailPending marks reports left pending by an earlier run as failed.
+	FailPending(ctx context.Context, reason string) (int64, error)
 	CreditsUsed(ctx context.Context, day string) (int, error)
 	AddCredits(ctx context.Context, day string, n, budget int) error
 	Close() error

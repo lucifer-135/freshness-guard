@@ -52,6 +52,11 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open the freshness database: %w", err)
 	}
+	if n, err := st.FailPending(context.Background(), "The gateway stopped before verification finished."); err != nil {
+		logger.Error("Reports left pending by an earlier run could not be closed.", "error", err)
+	} else if n > 0 {
+		logger.Warn("Reports left pending by an earlier run were marked as failed.", "count", n)
+	}
 	if cfg.TavilyAPIKey == "" {
 		logger.Warn("tavily_api_key is empty, so checked claims will be marked as could not verify.")
 	}

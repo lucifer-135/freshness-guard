@@ -414,6 +414,18 @@ func (s *SQLite) AddTimeline(ctx context.Context, factID int64, entries []report
 	return tx.Commit()
 }
 
+// FailPending marks every pending report as failed with the given reason and
+// returns how many it changed. It is called at startup, when no job of this
+// process can still be running.
+func (s *SQLite) FailPending(ctx context.Context, reason string) (int64, error) {
+	res, err := s.w.ExecContext(ctx, `UPDATE reports SET status = ?, reason = ? WHERE status = ?`,
+		string(report.StatusError), reason, string(report.StatusPending))
+	if err != nil {
+		return 0, fmt.Errorf("fail pending reports: %w", err)
+	}
+	return res.RowsAffected()
+}
+
 // CreditsUsed returns the Tavily credits used on day (YYYY-MM-DD).
 func (s *SQLite) CreditsUsed(ctx context.Context, day string) (int, error) {
 	var used int
