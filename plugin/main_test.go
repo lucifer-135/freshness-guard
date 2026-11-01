@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -32,17 +34,28 @@ func healthOK(port int) bool {
 	return resp.StatusCode == http.StatusOK
 }
 
-func initWithPort(t *testing.T, port int) {
+func initWith(t *testing.T, port int, dbPath string) {
 	t.Helper()
-	require.NoError(t, Init(map[string]any{"api": map[string]any{"port": float64(port)}}))
+	require.NoError(t, Init(map[string]any{
+		"api":     map[string]any{"port": float64(port), "token": "t"},
+		"db_path": dbPath,
+	}))
+}
+
+func newCtx() *schemas.BifrostContext {
+	return schemas.NewBifrostContext(context.Background(), time.Now().Add(time.Minute))
+}
+
+func TestGetName(t *testing.T) {
+	assert.Equal(t, "freshness-guard", GetName())
 }
 
 // Bifrost reloads a plugin by calling Init again on the same loaded .so before
 // it retires the old instance, so Init and Cleanup must pair up.
 func TestInitTwiceThenCleanupOnceKeepsServer(t *testing.T) {
-	port := freePort(t)
-	initWithPort(t, port)
-	initWithPort(t, port)
+	port, db := freePort(t), filepath.Join(t.TempDir(), "f.db")
+	initWith(t, port, db)
+	initWith(t, port, db)
 	require.NoError(t, Cleanup())
 	assert.True(t, healthOK(port), "health must still answer after one of two Cleanup calls")
 	require.NoError(t, Cleanup())
@@ -50,37 +63,61 @@ func TestInitTwiceThenCleanupOnceKeepsServer(t *testing.T) {
 }
 
 func TestInitWithNewPortMovesServer(t *testing.T) {
-	oldPort, newPort := freePort(t), freePort(t)
-	initWithPort(t, oldPort)
-	initWithPort(t, newPort)
+	oldPort, newPort, db := freePort(t), freePort(t), filepath.Join(t.TempDir(), "f.db")
+	initWith(t, oldPort, db)
+	initWith(t, newPort, db)
 	defer func() { _ = Cleanup(); _ = Cleanup() }()
 	assert.True(t, healthOK(newPort), "health must answer on the new port")
 	assert.False(t, healthOK(oldPort), "the old listener must be closed")
-}
-
-func TestGetName(t *testing.T) {
-	assert.Equal(t, "freshness-guard", GetName())
 }
 
 func TestInitSucceedsWhenAPIPortBusy(t *testing.T) {
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	defer l.Close()
-	port := l.Addr().(*net.TCPAddr).Port
-	assert.NoError(t, Init(map[string]any{"api": map[string]any{"port": float64(port)}}))
-	mu.Lock()
-	assert.Nil(t, server, "no server is kept when the port is busy")
-	mu.Unlock()
+	initWith(t, l.Addr().(*net.TCPAddr).Port, filepath.Join(t.TempDir(), "f.db"))
+	assert.NotNil(t, getApp(), "the pipeline keeps running without the API")
 	assert.NoError(t, Cleanup())
 }
 
-func TestResponseHeadersHookSetsSkipped(t *testing.T) {
-	require.NoError(t, Init(map[string]any{"api": map[string]any{"port": float64(freePort(t))}}))
+func TestInitWithBadDatabaseStillSucceeds(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "file")
+	require.NoError(t, os.WriteFile(file, []byte("x"), 0o600))
+	initWith(t, freePort(t), filepath.Join(file, "f.db"))
 	defer Cleanup()
+	assert.Nil(t, getApp())
 	md := &schemas.HTTPResponseMetadata{}
-	ctx := schemas.NewBifrostContext(context.Background(), time.Now().Add(time.Minute))
+	assert.NoError(t, HTTPTransportResponseHeadersHook(newCtx(), &schemas.HTTPRequest{}, md))
+	assert.Equal(t, "error", md.Header("X-Freshness-Status"))
+}
+
+func TestHooksSetSkippedWithoutAnswer(t *testing.T) {
+	initWith(t, freePort(t), filepath.Join(t.TempDir(), "f.db"))
+	defer Cleanup()
+	ctx := newCtx()
+	resp, err := HTTPTransportPreHook(ctx, &schemas.HTTPRequest{})
+	assert.Nil(t, resp)
+	assert.NoError(t, err)
+	md := &schemas.HTTPResponseMetadata{}
 	assert.NoError(t, HTTPTransportResponseHeadersHook(ctx, &schemas.HTTPRequest{}, md))
 	assert.Equal(t, "skipped", md.Header("X-Freshness-Status"))
+}
+
+func TestLLMHooksPassThrough(t *testing.T) {
+	initWith(t, freePort(t), filepath.Join(t.TempDir(), "f.db"))
+	defer Cleanup()
+	ctx := newCtx()
+	req := &schemas.BifrostRequest{RequestType: schemas.ChatCompletionRequest}
+	gotReq, short, err := PreLLMHook(ctx, req)
+	assert.Same(t, req, gotReq)
+	assert.Nil(t, short)
+	assert.NoError(t, err)
+
+	resp, bErr := &schemas.BifrostResponse{}, &schemas.BifrostError{}
+	gotResp, gotErr, err := PostLLMHook(ctx, resp, bErr)
+	assert.Same(t, resp, gotResp)
+	assert.Same(t, bErr, gotErr)
+	assert.NoError(t, err)
 }
 
 func TestResponseHeadersHookNilMetadata(t *testing.T) {

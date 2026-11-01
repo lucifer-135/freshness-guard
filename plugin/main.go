@@ -4,34 +4,43 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"os"
+	"reflect"
 	"sync"
 	"time"
 
 	"github.com/maximhq/bifrost/core/schemas"
 
-	"github.com/lucifer-135/freshness-guard/internal/api"
+	"github.com/lucifer-135/freshness-guard/internal/app"
 	"github.com/lucifer-135/freshness-guard/internal/config"
 	"github.com/lucifer-135/freshness-guard/internal/hooks"
 )
 
-const pluginName = "freshness-guard"
+const (
+	pluginName  = "freshness-guard"
+	stopTimeout = 15 * time.Second
+)
 
 // Bifrost reloads a plugin at runtime by calling Init again on the same loaded
 // .so before it retires the old instance, so the package state is shared and
 // Init/Cleanup calls are reference-counted.
 var (
-	mu         sync.Mutex
-	server     *api.Server
-	serverPort int
+	mu         sync.RWMutex
+	current    *app.App
+	currentCfg config.Config
 	refs       int
 	logger     = slog.New(slog.NewJSONHandler(os.Stderr, nil)).With("plugin", pluginName)
 )
 
-// Init parses the plugin config and starts the API server, or keeps the running
-// one when the port is unchanged. It always returns nil so that a plugin
+func getApp() *app.App {
+	mu.RLock()
+	defer mu.RUnlock()
+	return current
+}
+
+// Init parses the plugin config and starts the plugin, or keeps the running
+// one when the config is unchanged. It always returns nil so that a plugin
 // problem never stops Bifrost from starting.
 func Init(raw any) error {
 	cfg, warnings := config.Parse(raw)
@@ -42,29 +51,33 @@ func Init(raw any) error {
 	mu.Lock()
 	defer mu.Unlock()
 	refs++
-	if server != nil && serverPort == cfg.APIPort {
+	if current != nil && reflect.DeepEqual(currentCfg, cfg) {
 		return nil
 	}
-	if server != nil {
-		shutdown(server)
-		server = nil
+	if current != nil {
+		stop(current)
+		current = nil
 	}
 
-	srv := api.NewServer(fmt.Sprintf("%s:%d", cfg.APIHost, cfg.APIPort), api.NewHandler(api.Deps{Token: cfg.APIToken}), logger)
-	if err := srv.Start(); err != nil {
-		logger.Error("freshness-guard API server did not start", "port", cfg.APIPort, "error", err)
+	a, err := app.New(cfg, logger)
+	if err != nil {
+		logger.Error("Freshness Guard could not start, so answers pass through unchecked.", "error", err)
 		return nil
 	}
-	server, serverPort = srv, cfg.APIPort
-	logger.Info("freshness-guard API server started", "port", cfg.APIPort)
+	if err := a.Start(); err != nil {
+		logger.Error("freshness-guard API server did not start", "port", cfg.APIPort, "error", err)
+	} else {
+		logger.Info("freshness-guard API server started", "port", cfg.APIPort)
+	}
+	current, currentCfg = a, cfg
 	return nil
 }
 
-func shutdown(srv *api.Server) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+func stop(a *app.App) {
+	ctx, cancel := context.WithTimeout(context.Background(), stopTimeout)
 	defer cancel()
-	if err := srv.Shutdown(ctx); err != nil {
-		logger.Error("freshness-guard API server did not stop cleanly", "error", err)
+	if err := a.Stop(ctx); err != nil {
+		logger.Error("Freshness Guard did not stop cleanly.", "error", err)
 	}
 }
 
@@ -73,25 +86,63 @@ func GetName() string {
 	return pluginName
 }
 
-// Cleanup stops the API server when the last Init has been paired with a Cleanup.
+// Cleanup stops the plugin when the last Init has been paired with a Cleanup.
 func Cleanup() error {
 	mu.Lock()
 	defer mu.Unlock()
 	if refs > 0 {
 		refs--
 	}
-	if refs > 0 || server == nil {
+	if refs > 0 || current == nil {
 		return nil
 	}
-	shutdown(server)
-	server = nil
+	stop(current)
+	current = nil
 	return nil
 }
 
-// HTTPTransportResponseHeadersHook adds the X-Freshness-Status header.
-func HTTPTransportResponseHeadersHook(_ *schemas.BifrostContext, _ *schemas.HTTPRequest, resp *schemas.HTTPResponseMetadata) error {
+// guard runs fn inside hooks.Guard and marks the request as failed when fn
+// panics.
+func guard(ctx *schemas.BifrostContext, name string, fn func()) {
+	if !hooks.Guard(logger, name, func() error { fn(); return nil }) {
+		hooks.MarkFailed(ctx)
+	}
+}
+
+// HTTPTransportPreHook selects the mode for the request.
+func HTTPTransportPreHook(ctx *schemas.BifrostContext, req *schemas.HTTPRequest) (*schemas.HTTPResponse, error) {
+	if a := getApp(); a != nil {
+		guard(ctx, "HTTPTransportPreHook", func() { a.Hooks.TransportPre(ctx, req) })
+	}
+	return nil, nil
+}
+
+// PreLLMHook records the prompt and model. The request passes through unchanged.
+func PreLLMHook(ctx *schemas.BifrostContext, req *schemas.BifrostRequest) (*schemas.BifrostRequest, *schemas.LLMPluginShortCircuit, error) {
+	if a := getApp(); a != nil {
+		guard(ctx, "PreLLMHook", func() { a.Hooks.PreLLM(ctx, req) })
+	}
+	return req, nil, nil
+}
+
+// PostLLMHook submits the answer for verification. The response passes
+// through unchanged.
+func PostLLMHook(ctx *schemas.BifrostContext, resp *schemas.BifrostResponse, bifrostErr *schemas.BifrostError) (*schemas.BifrostResponse, *schemas.BifrostError, error) {
+	if a := getApp(); a != nil {
+		guard(ctx, "PostLLMHook", func() { a.Hooks.PostLLM(ctx, resp) })
+	}
+	return resp, bifrostErr, nil
+}
+
+// HTTPTransportResponseHeadersHook adds the X-Freshness-* headers.
+func HTTPTransportResponseHeadersHook(ctx *schemas.BifrostContext, _ *schemas.HTTPRequest, resp *schemas.HTTPResponseMetadata) error {
+	a := getApp()
+	if a == nil {
+		hooks.SetStatusHeader(resp, hooks.StatusError)
+		return nil
+	}
 	ok := hooks.Guard(logger, "HTTPTransportResponseHeadersHook", func() error {
-		hooks.SetStatusHeader(resp, hooks.StatusSkipped)
+		a.Hooks.ResponseHeaders(ctx, resp)
 		return nil
 	})
 	if !ok {
