@@ -22,12 +22,17 @@ ENV CGO_ENABLED=1 GOOS=linux
 WORKDIR /build
 COPY --from=bifrost-src transports ./bifrost/transports
 COPY --from=ui /app/out ./bifrost/transports/bifrost-http/ui
+# The workspace needs only the plugin's go.mod and go.sum to resolve versions,
+# so Bifrost is built before the plugin sources are copied. A change to the
+# plugin then rebuilds only the plugin.
 COPY go.mod go.sum ./fg/
+RUN go work init ./bifrost/transports ./fg
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    cd bifrost/transports && go build -trimpath -tags sqlite_static -o /out/bifrost-http ./bifrost-http
 COPY plugin ./fg/plugin
 COPY internal ./fg/internal
-RUN go work init ./bifrost/transports ./fg
-RUN cd bifrost/transports && go build -trimpath -tags sqlite_static -o /out/bifrost-http ./bifrost-http
-RUN cd fg && go build -trimpath -tags sqlite_static -buildmode=plugin -o /out/freshness-guard.so ./plugin
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    cd fg && go build -trimpath -tags sqlite_static -buildmode=plugin -o /out/freshness-guard.so ./plugin
 
 FROM debian:trixie-slim AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
