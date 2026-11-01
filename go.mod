@@ -3,6 +3,7 @@ module github.com/lucifer-135/freshness-guard
 go 1.27.3
 
 require (
+	github.com/mattn/go-sqlite3 v1.14.32
 	github.com/maximhq/bifrost/core v1.14.1
 	github.com/stretchr/testify v1.12.1
 )
