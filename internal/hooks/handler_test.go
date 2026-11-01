@@ -106,16 +106,8 @@ func TestAsyncChatSubmitsJobAndSetsHeaders(t *testing.T) {
 		&schemas.ChatMessageContent{ContentStr: str(testAnswer)})
 	require.Len(t, jobs.jobs, 1)
 	assert.Equal(t, engine.Job{ReportID: "r-1", Answer: testAnswer, Prompt: "What does X cost?",
-		Model: "groq/openai/gpt-oss-20b", Provider: "groq", VirtualKey: "vk-1", Mode: "async", At: hookNow}, jobs.jobs[0])
+		Model: "groq/openai/gpt-oss-20b", Provider: "groq", VirtualKey: "vk-1", Mode: "async", Policy: "heal", At: hookNow}, jobs.jobs[0])
 	assert.Equal(t, "r-1", md.Header("X-Freshness-Report-Id"))
-	assert.Equal(t, "pending", md.Header("X-Freshness-Status"))
-}
-
-func TestSyncIsHandledLikeAsyncInM1(t *testing.T) {
-	jobs := &fakeSubmitter{}
-	md := runChat(newHandler(jobs), map[string]string{"x-bf-freshness": "sync"}, &schemas.ChatMessageContent{ContentStr: str(testAnswer)})
-	require.Len(t, jobs.jobs, 1)
-	assert.Equal(t, "sync", jobs.jobs[0].Mode)
 	assert.Equal(t, "pending", md.Header("X-Freshness-Status"))
 }
 

@@ -40,3 +40,15 @@ func TestSelectMode(t *testing.T) {
 		})
 	}
 }
+
+func TestSelectPolicy(t *testing.T) {
+	cfg := config.Default()
+	cfg.VirtualKeys = map[string]config.VirtualKey{
+		"vk-a": {Mode: "sync", SampleRate: 1, Policy: "annotate"},
+		"vk-b": {Mode: "sync", SampleRate: 1},
+	}
+	assert.Equal(t, hooks.PolicyBlock, hooks.SelectPolicy("BLOCK", "", cfg))
+	assert.Equal(t, hooks.PolicyAnnotate, hooks.SelectPolicy("fix", "vk-a", cfg))
+	assert.Equal(t, hooks.PolicyHeal, hooks.SelectPolicy("", "vk-b", cfg))
+	assert.Equal(t, hooks.PolicyHeal, hooks.SelectPolicy("", "", cfg))
+}

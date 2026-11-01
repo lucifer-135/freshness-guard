@@ -38,3 +38,30 @@ func SelectMode(header, virtualKey string, cfg config.Config, sample float64) Mo
 	}
 	return Mode(cfg.DefaultMode)
 }
+
+// Policy says what synchronous mode does with an answer that has outdated
+// claims.
+type Policy string
+
+// Policies.
+const (
+	PolicyAnnotate Policy = "annotate"
+	PolicyHeal     Policy = "heal"
+	PolicyBlock    Policy = "block"
+)
+
+// HeaderPolicy is the request header that selects the policy.
+const HeaderPolicy = "x-bf-freshness-policy"
+
+// SelectPolicy picks the policy for a request: a valid x-bf-freshness-policy
+// header wins, then the virtual key's policy, then the configured default.
+func SelectPolicy(header, virtualKey string, cfg config.Config) Policy {
+	switch p := Policy(strings.ToLower(strings.TrimSpace(header))); p {
+	case PolicyAnnotate, PolicyHeal, PolicyBlock:
+		return p
+	}
+	if vk, ok := cfg.VirtualKeys[virtualKey]; ok && virtualKey != "" && vk.Policy != "" {
+		return Policy(vk.Policy)
+	}
+	return Policy(cfg.DefaultPolicy)
+}

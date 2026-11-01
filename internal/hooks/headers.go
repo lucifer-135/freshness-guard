@@ -6,7 +6,12 @@ import "github.com/maximhq/bifrost/core/schemas"
 const (
 	HeaderStatus   = "X-Freshness-Status"
 	HeaderReportID = "X-Freshness-Report-Id"
+	HeaderScore    = "X-Freshness-Score"
+	HeaderStale    = "X-Freshness-Stale"
+	HeaderChecked  = "X-Freshness-Checked"
+	HeaderHealed   = "X-Freshness-Healed"
 	StatusPending  = "pending"
+	StatusComplete = "complete"
 	StatusSkipped  = "skipped"
 	StatusError    = "error"
 )

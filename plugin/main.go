@@ -138,13 +138,23 @@ func PreLLMHook(ctx *schemas.BifrostContext, req *schemas.BifrostRequest) (*sche
 	return req, nil, nil
 }
 
-// PostLLMHook submits the answer for verification. The response passes
-// through unchanged.
+// PostLLMHook submits the answer for verification. In sync mode the heal
+// policy may replace the answer and the block policy may return an error;
+// otherwise, and whenever the hook fails, the response passes unchanged.
 func PostLLMHook(ctx *schemas.BifrostContext, resp *schemas.BifrostResponse, bifrostErr *schemas.BifrostError) (*schemas.BifrostResponse, *schemas.BifrostError, error) {
-	if a := getApp(); a != nil {
-		guard(ctx, "PostLLMHook", func() { a.Hooks.PostLLM(ctx, resp) })
+	a := getApp()
+	if a == nil {
+		return resp, bifrostErr, nil
 	}
-	return resp, bifrostErr, nil
+	outResp, outErr := resp, bifrostErr
+	guard(ctx, "PostLLMHook", func() {
+		r, blocked := a.Hooks.PostLLM(ctx, resp)
+		outResp = r
+		if blocked != nil {
+			outErr = blocked
+		}
+	})
+	return outResp, outErr, nil
 }
 
 // HTTPTransportResponseHeadersHook adds the X-Freshness-* headers.
