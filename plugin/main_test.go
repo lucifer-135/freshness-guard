@@ -68,6 +68,9 @@ func TestInitSucceedsWhenAPIPortBusy(t *testing.T) {
 	defer l.Close()
 	port := l.Addr().(*net.TCPAddr).Port
 	assert.NoError(t, Init(map[string]any{"api": map[string]any{"port": float64(port)}}))
+	mu.Lock()
+	assert.Nil(t, server, "no server is kept when the port is busy")
+	mu.Unlock()
 	assert.NoError(t, Cleanup())
 }
 

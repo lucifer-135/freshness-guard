@@ -50,7 +50,7 @@ func Init(raw any) error {
 		server = nil
 	}
 
-	srv := api.NewServer(fmt.Sprintf("0.0.0.0:%d", cfg.APIPort))
+	srv := api.NewServer(fmt.Sprintf("%s:%d", cfg.APIHost, cfg.APIPort), api.NewHandler(api.Deps{Token: cfg.APIToken}), logger)
 	if err := srv.Start(); err != nil {
 		logger.Error("freshness-guard API server did not start", "port", cfg.APIPort, "error", err)
 		return nil
@@ -90,10 +90,14 @@ func Cleanup() error {
 
 // HTTPTransportResponseHeadersHook adds the X-Freshness-Status header.
 func HTTPTransportResponseHeadersHook(_ *schemas.BifrostContext, _ *schemas.HTTPRequest, resp *schemas.HTTPResponseMetadata) error {
-	return hooks.Guard(logger, "HTTPTransportResponseHeadersHook", func() error {
+	ok := hooks.Guard(logger, "HTTPTransportResponseHeadersHook", func() error {
 		hooks.SetStatusHeader(resp, hooks.StatusSkipped)
 		return nil
 	})
+	if !ok {
+		hooks.SetStatusHeader(resp, hooks.StatusError)
+	}
+	return nil
 }
 
 func main() {}

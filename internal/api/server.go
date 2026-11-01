@@ -4,30 +4,39 @@ package api
 
 import (
 	"context"
+	"errors"
+	"log/slog"
 	"net"
 	"net/http"
 	"time"
 )
 
-// Server is the plugin's HTTP API server.
-type Server struct {
-	addr string
-	http *http.Server
+// Deps holds what the API handlers need.
+type Deps struct {
+	Token string
 }
 
-// NewServer creates a server that will listen on addr.
-func NewServer(addr string) *Server {
+// NewHandler returns the plugin API's request handler.
+func NewHandler(deps Deps) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /freshness/health", handleHealth)
-	return &Server{
-		addr: addr,
-		http: &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second},
-	}
+	return mux
 }
 
-// Handler returns the server's request handler.
-func (s *Server) Handler() http.Handler {
-	return s.http.Handler
+// Server is the plugin's HTTP API server.
+type Server struct {
+	addr   string
+	http   *http.Server
+	logger *slog.Logger
+}
+
+// NewServer creates a server that will serve handler on addr.
+func NewServer(addr string, handler http.Handler, logger *slog.Logger) *Server {
+	return &Server{
+		addr:   addr,
+		http:   &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second},
+		logger: logger,
+	}
 }
 
 // Start binds the listener synchronously, so a busy port is reported at once,
@@ -37,8 +46,14 @@ func (s *Server) Start() error {
 	if err != nil {
 		return err
 	}
-	go func() { _ = s.http.Serve(listener) }()
+	go s.serve(listener)
 	return nil
+}
+
+func (s *Server) serve(listener net.Listener) {
+	if err := s.http.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		s.logger.Error("The freshness-guard API server stopped unexpectedly.", "error", err)
+	}
 }
 
 // Shutdown stops the server gracefully.
