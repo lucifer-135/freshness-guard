@@ -155,6 +155,14 @@ func TestSearchReturnsVersionResults(t *testing.T) {
 	assert.Equal(t, "https://example.com/releases", out.Results[0].URL)
 }
 
+func TestRateLimitedModelReturns429(t *testing.T) {
+	rec := httptest.NewRecorder()
+	body := `{"model":"` + RateLimitedModel + `","messages":[{"role":"user","content":"hi"}]}`
+	newHandler().ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(body)))
+	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
+	assert.Contains(t, rec.Body.String(), "rate_limit_exceeded")
+}
+
 func TestHealthz(t *testing.T) {
 	rec := httptest.NewRecorder()
 	newHandler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))

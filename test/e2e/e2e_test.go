@@ -147,6 +147,20 @@ func TestChatReturnsPendingReport(t *testing.T) {
 	assertAnswerReport(t, getReport(t, id))
 }
 
+// Bifrost runs the plugin's LLM hooks once per attempt; the answer from the
+// fallback must still be checked.
+func TestFallbackAnswerIsChecked(t *testing.T) {
+	resp := postChat(t, `{"model":"openai/fake-ratelimited","fallbacks":["openai/fake-model"],
+		"messages":[{"role":"user","content":"What does Example Cloud Pro cost?"}]}`, nil)
+	body := readBody(t, resp)
+	require.Equal(t, http.StatusOK, resp.StatusCode, body)
+	assert.Contains(t, body, "Example Cloud Pro costs $20 per month")
+	assert.Equal(t, "pending", resp.Header.Get("X-Freshness-Status"))
+	id := resp.Header.Get("X-Freshness-Report-Id")
+	require.NotEmpty(t, id)
+	assertAnswerReport(t, getReport(t, id))
+}
+
 func TestStreamingChatIsSkippedAndIntact(t *testing.T) {
 	resp := postChat(t, `{"model":"openai/fake-model","stream":true,"messages":[{"role":"user","content":"hi"}]}`, nil)
 	defer resp.Body.Close()

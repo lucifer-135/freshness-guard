@@ -22,6 +22,8 @@ const (
 	ExtractModel = "fake-extract"
 	JudgeModel   = "fake-judge"
 	TavilyKey    = "fake-tavily-key"
+	// RateLimitedModel always answers HTTP 429, so tests can exercise fallbacks.
+	RateLimitedModel = "fake-ratelimited"
 )
 
 // extraction is the fake-extract reply: the two claims in Answer.
@@ -59,6 +61,12 @@ func handleChat(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Model == "" {
 		req.Model = modelID
+	}
+	if req.Model == RateLimitedModel {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":{"message":"Rate limit reached.","type":"rate_limit_exceeded","code":"rate_limit_exceeded"}}`))
+		return
 	}
 	if req.Stream {
 		streamChat(w, req.Model)
