@@ -27,7 +27,7 @@
         "models": { "extract": "groq/openai/gpt-oss-20b", "judge": "groq/openai/gpt-oss-120b" },
         "fallbacks": { "extract": ["gemini/gemini-3.5-flash-lite"], "judge": ["gemini/gemini-3.5-flash"] },
         "model_cutoffs": { "groq/openai/gpt-oss-20b": "2024-06", "groq/openai/gpt-oss-120b": "2024-06" },
-        "daily_credit_budget": 30,
+        "daily_credit_budget": 200,
         "db_path": "/app/data/freshness.db"
       }
     }
