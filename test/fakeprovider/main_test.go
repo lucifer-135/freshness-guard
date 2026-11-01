@@ -51,7 +51,7 @@ func TestModelsListsAllFakeModels(t *testing.T) {
 	for _, m := range resp.Data {
 		ids = append(ids, m.ID)
 	}
-	assert.ElementsMatch(t, []string{"fake-model", ExtractModel, JudgeModel}, ids)
+	assert.ElementsMatch(t, []string{"fake-model", ExtractModel, JudgeModel, HealModel}, ids)
 }
 
 // chatContent posts a chat request and returns the first choice's content.
@@ -167,4 +167,16 @@ func TestHealthz(t *testing.T) {
 	rec := httptest.NewRecorder()
 	newHandler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))
 	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestFakeHealReplacesValues(t *testing.T) {
+	user, _ := json.Marshal(map[string]any{
+		"answer":      Answer,
+		"corrections": []map[string]string{{"value": "$20 per month", "current_value": "$25 per month"}},
+	})
+	var out struct {
+		Text string `json:"text"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(chatContent(t, HealModel, string(user))), &out))
+	assert.Equal(t, strings.Replace(Answer, "$20 per month", "$25 per month", 1), out.Text)
 }

@@ -17,8 +17,9 @@
         "bifrost_base_url": "http://127.0.0.1:8080",
         "tavily_api_key": "fake-tavily-key",
         "tavily_base_url": "http://fakeprovider:9000",
-        "models": { "extract": "openai/fake-extract", "judge": "openai/fake-judge" },
-        "fallbacks": { "extract": [], "judge": [] },
+        "models": { "extract": "openai/fake-extract", "judge": "openai/fake-judge", "heal": "openai/fake-heal" },
+        "fallbacks": { "extract": [], "judge": [], "heal": [] },
+        "sync_timeout_ms": 20000,
         "daily_credit_budget": 1000,
         "db_path": "/app/data/freshness.db"
       }

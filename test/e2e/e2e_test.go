@@ -6,10 +6,12 @@ package e2e
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -94,6 +96,9 @@ type freshnessReport struct {
 	Score        *int    `json:"score"`
 	StaleCount   int     `json:"stale_count"`
 	CheckedCount int     `json:"checked_count"`
+	Policy       string  `json:"policy"`
+	HealedText   string  `json:"healed_text"`
+	Blocked      bool    `json:"blocked"`
 	Claims       []claim `json:"claims"`
 }
 
@@ -161,35 +166,6 @@ func TestFallbackAnswerIsChecked(t *testing.T) {
 	assertAnswerReport(t, getReport(t, id))
 }
 
-func TestStreamingChatIsSkippedAndIntact(t *testing.T) {
-	resp := postChat(t, `{"model":"openai/fake-model","stream":true,"messages":[{"role":"user","content":"hi"}]}`, nil)
-	defer resp.Body.Close()
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	assert.Equal(t, "skipped", resp.Header.Get("X-Freshness-Status"))
-
-	var text strings.Builder
-	scanner := bufio.NewScanner(resp.Body)
-	for scanner.Scan() {
-		data, ok := strings.CutPrefix(scanner.Text(), "data: ")
-		if !ok || data == "[DONE]" {
-			continue
-		}
-		var chunk struct {
-			Choices []struct {
-				Delta struct {
-					Content string `json:"content"`
-				} `json:"delta"`
-			} `json:"choices"`
-		}
-		require.NoError(t, json.Unmarshal([]byte(data), &chunk))
-		for _, c := range chunk.Choices {
-			text.WriteString(c.Delta.Content)
-		}
-	}
-	require.NoError(t, scanner.Err())
-	assert.Equal(t, answer, text.String())
-}
-
 func TestOffModeHasNoFreshnessHeaders(t *testing.T) {
 	resp := postChat(t, `{"model":"openai/fake-model","messages":[{"role":"user","content":"hi"}]}`,
 		map[string]string{"x-bf-freshness": "off"})
@@ -235,4 +211,133 @@ func TestPluginHealthEndpoint(t *testing.T) {
 	resp := pluginRequest(t, http.MethodGet, "/freshness/health", "", false)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.JSONEq(t, `{"status":"ok","plugin":"freshness-guard"}`, readBody(t, resp))
+}
+
+const questionBody = `{"model":"openai/fake-model","messages":[{"role":"user","content":"What does Example Cloud Pro cost?"}]}`
+
+func syncHeaders(policy string) map[string]string {
+	return map[string]string{"x-bf-freshness": "sync", "x-bf-freshness-policy": policy}
+}
+
+func TestSyncHealCorrectsAnswer(t *testing.T) {
+	resp := postChat(t, questionBody, syncHeaders("heal"))
+	body := readBody(t, resp)
+	require.Equal(t, http.StatusOK, resp.StatusCode, body)
+	assert.Contains(t, body, "$25 per month")
+	assert.NotContains(t, body, "$20 per month")
+	assert.Equal(t, "complete", resp.Header.Get("X-Freshness-Status"))
+	assert.Equal(t, "1", resp.Header.Get("X-Freshness-Stale"))
+	assert.Equal(t, "2/2", resp.Header.Get("X-Freshness-Checked"))
+	assert.Equal(t, "1", resp.Header.Get("X-Freshness-Healed"))
+	assert.NotEmpty(t, resp.Header.Get("X-Freshness-Score"))
+	r := getReport(t, resp.Header.Get("X-Freshness-Report-Id"))
+	assert.Equal(t, "heal", r.Policy)
+	assert.Contains(t, r.HealedText, "$25 per month")
+}
+
+func TestSyncAnnotateKeepsAnswer(t *testing.T) {
+	resp := postChat(t, questionBody, syncHeaders("annotate"))
+	body := readBody(t, resp)
+	require.Equal(t, http.StatusOK, resp.StatusCode, body)
+	assert.Contains(t, body, "$20 per month")
+	assert.Equal(t, "complete", resp.Header.Get("X-Freshness-Status"))
+	assert.Empty(t, resp.Header.Get("X-Freshness-Healed"))
+}
+
+func TestSyncBlockReturns422(t *testing.T) {
+	resp := postChat(t, questionBody, syncHeaders("block"))
+	body := readBody(t, resp)
+	require.Equal(t, http.StatusUnprocessableEntity, resp.StatusCode, body)
+	assert.Contains(t, body, "freshness_blocked")
+	m := regexp.MustCompile(`Report ID: ([0-9a-f-]+)\.`).FindStringSubmatch(body)
+	require.Len(t, m, 2, body)
+	assert.True(t, getReport(t, m[1]).Blocked)
+}
+
+func TestStreamingAnswerIsChecked(t *testing.T) {
+	resp := postChat(t, `{"model":"openai/fake-model","stream":true,"messages":[{"role":"user","content":"What does it cost?"}]}`, nil)
+	assert.Equal(t, "pending", resp.Header.Get("X-Freshness-Status"))
+	id := resp.Header.Get("X-Freshness-Report-Id")
+	require.NotEmpty(t, id)
+	var text strings.Builder
+	scanner := bufio.NewScanner(resp.Body)
+	for scanner.Scan() {
+		data, ok := strings.CutPrefix(scanner.Text(), "data: ")
+		if !ok || data == "[DONE]" {
+			continue
+		}
+		var chunk struct {
+			Choices []struct {
+				Delta struct {
+					Content string `json:"content"`
+				} `json:"delta"`
+			} `json:"choices"`
+		}
+		require.NoError(t, json.Unmarshal([]byte(data), &chunk))
+		for _, c := range chunk.Choices {
+			text.WriteString(c.Delta.Content)
+		}
+	}
+	resp.Body.Close()
+	assert.Equal(t, answer, text.String())
+	r := getReport(t, id)
+	assert.Equal(t, "complete", r.Status, r.Reason)
+	assert.Len(t, r.Claims, 2)
+}
+
+func TestEventsShowReportProgress(t *testing.T) {
+	waitReady(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pluginURL()+"/freshness/events", nil)
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer "+token())
+	stream, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer stream.Body.Close()
+	lines := bufio.NewReader(stream.Body)
+	first, err := lines.ReadString('\n')
+	require.NoError(t, err)
+	require.Equal(t, ": connected\n", first)
+
+	body, _ := json.Marshal(map[string]string{"text": answer})
+	resp := pluginRequest(t, http.MethodPost, "/freshness/check", string(body), true)
+	var r freshnessReport
+	require.NoError(t, json.Unmarshal([]byte(readBody(t, resp)), &r))
+	require.NotEmpty(t, r.ID)
+
+	seen := map[string]int{}
+	for seen["report.complete"] == 0 {
+		line, err := lines.ReadString('\n')
+		require.NoError(t, err, "stream ended before report.complete; seen %v", seen)
+		if data, ok := strings.CutPrefix(strings.TrimSpace(line), "data: "); ok {
+			var e struct {
+				Type     string `json:"type"`
+				ReportID string `json:"report_id"`
+			}
+			require.NoError(t, json.Unmarshal([]byte(data), &e))
+			if e.ReportID == r.ID {
+				seen[e.Type]++
+			}
+		}
+	}
+	assert.Equal(t, 1, seen["report.started"])
+	assert.Equal(t, 1, seen["report.claims"])
+	assert.Equal(t, 2, seen["claim.verdict"])
+}
+
+func TestChatProxyChecksAnswer(t *testing.T) {
+	body := `{"model":"openai/fake-model","messages":[{"role":"user","content":"What does it cost?"}],"mode":"sync","policy":"heal"}`
+	resp := pluginRequest(t, http.MethodPost, "/freshness/chat", body, true)
+	text := readBody(t, resp)
+	require.Equal(t, http.StatusOK, resp.StatusCode, text)
+	assert.Contains(t, text, "$25 per month")
+	assert.Equal(t, "complete", resp.Header.Get("X-Freshness-Status"))
+}
+
+func TestModelsEndpointListsFakeModels(t *testing.T) {
+	resp := pluginRequest(t, http.MethodGet, "/freshness/models", "", true)
+	text := readBody(t, resp)
+	require.Equal(t, http.StatusOK, resp.StatusCode, text)
+	assert.Contains(t, text, "openai/fake-model")
 }

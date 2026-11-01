@@ -21,6 +21,7 @@ const (
 	modelID      = "fake-model"
 	ExtractModel = "fake-extract"
 	JudgeModel   = "fake-judge"
+	HealModel    = "fake-heal"
 	TavilyKey    = "fake-tavily-key"
 	// RateLimitedModel always answers HTTP 429, so tests can exercise fallbacks.
 	RateLimitedModel = "fake-ratelimited"
@@ -78,11 +79,9 @@ func handleChat(w http.ResponseWriter, r *http.Request) {
 	case ExtractModel:
 		content = extraction
 	case JudgeModel:
-		user := ""
-		if len(req.Messages) > 0 {
-			user = req.Messages[len(req.Messages)-1].Content
-		}
-		content = judge(user)
+		content = judge(lastUser(req))
+	case HealModel:
+		content = healAnswer(lastUser(req))
 	}
 	writeJSON(w, map[string]any{
 		"id":      "chatcmpl-fake",
@@ -96,6 +95,31 @@ func handleChat(w http.ResponseWriter, r *http.Request) {
 		}},
 		"usage": map[string]any{"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
 	})
+}
+
+func lastUser(req chatRequest) string {
+	if len(req.Messages) == 0 {
+		return ""
+	}
+	return req.Messages[len(req.Messages)-1].Content
+}
+
+// healAnswer replaces each correction's old value with its current value.
+func healAnswer(user string) string {
+	var in struct {
+		Answer      string `json:"answer"`
+		Corrections []struct {
+			Value        string `json:"value"`
+			CurrentValue string `json:"current_value"`
+		} `json:"corrections"`
+	}
+	_ = json.Unmarshal([]byte(user), &in)
+	text := in.Answer
+	for _, c := range in.Corrections {
+		text = strings.Replace(text, c.Value, c.CurrentValue, 1)
+	}
+	out, _ := json.Marshal(map[string]string{"text": text})
+	return string(out)
 }
 
 // judge answers the plugin's judge input: price claims are STALE (now $25 per
@@ -217,7 +241,7 @@ func streamChat(w http.ResponseWriter, model string) {
 
 func handleModels(w http.ResponseWriter, _ *http.Request) {
 	data := []map[string]any{}
-	for _, id := range []string{modelID, ExtractModel, JudgeModel} {
+	for _, id := range []string{modelID, ExtractModel, JudgeModel, HealModel} {
 		data = append(data, map[string]any{"id": id, "object": "model", "owned_by": "fakeprovider"})
 	}
 	writeJSON(w, map[string]any{"object": "list", "data": data})
