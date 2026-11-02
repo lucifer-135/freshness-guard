@@ -77,7 +77,7 @@ export async function apiJSON<T>(path: string, init?: RequestInit): Promise<T> {
   return (await resp.json()) as T
 }
 
-function normalizeClaim(claim: Partial<Claim> & { id: string }): Claim {
+export function normalizeClaim(claim: Partial<Claim> & { id: string }): Claim {
   return {
     quote: '',
     span_start: -1,
