@@ -1,0 +1,190 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+
+/* Design tokens from DESIGN.md section 3. Version 1 ships a dark theme only. */
+:root {
+  --bg: #07090D;
+  --surface-1: #0D1117;
+  --surface-2: #131923;
+  --surface-3: #1A2230;
+  --border: #263041;
+  --border-strong: #3A475C;
+  --text: #E8EDF5;
+  --text-muted: #94A3B8;
+  --text-subtle: #7C8BA1;
+
+  --accent: #8B7CFF;
+  --accent-strong: #A99BFF;
+  --accent-soft: #8B7CFF1F;
+
+  --status-current: #34D399;
+  --status-unverified: #FBBF24;
+  --status-outdated: #FB7185;
+  --status-incorrect: #E879F9;
+  --status-unchecked: #64748B;
+
+  --dur-press: 80ms;
+  --dur-hover: 150ms;
+  --dur-enter: 220ms;
+  --dur-panel: 360ms;
+  --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-exit: cubic-bezier(0.7, 0, 0.84, 0);
+
+  --shadow-float: 0 16px 48px #00000080;
+  --highlight-top: inset 0 1px 0 #FFFFFF0D;
+
+  /* shadcn/ui variables, mapped onto the design tokens. shadcn uses "accent"
+     for subtle hover backgrounds, so it gets the soft accent; the brand
+     violet is "primary". */
+  --background: var(--bg);
+  --foreground: var(--text);
+  --card: var(--surface-2);
+  --card-foreground: var(--text);
+  --popover: var(--surface-3);
+  --popover-foreground: var(--text);
+  --primary: var(--accent);
+  --primary-foreground: var(--bg);
+  --secondary: var(--surface-3);
+  --secondary-foreground: var(--text);
+  --muted: var(--surface-2);
+  --muted-foreground: var(--text-muted);
+  --destructive: var(--status-outdated);
+  --input: var(--border);
+  --ring: var(--accent);
+  --radius: 6px;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-text-subtle: var(--text-subtle);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-status-current: var(--status-current);
+  --color-status-unverified: var(--status-unverified);
+  --color-status-outdated: var(--status-outdated);
+  --color-status-incorrect: var(--status-incorrect);
+  --color-status-unchecked: var(--status-unchecked);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent-soft);
+  --color-accent-foreground: var(--text);
+  --color-destructive: var(--destructive);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* DESIGN.md section 9: 2px accent focus rings with a 2px offset, never removed. */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-subtle);
+  }
+
+  /* Claim underlines (DESIGN.md section 3.3): colour is never the only signal. */
+  .claim-current,
+  .claim-unverified,
+  .claim-outdated,
+  .claim-incorrect,
+  .claim-unchecked {
+    text-decoration-line: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
+  }
+
+  .claim-current {
+    text-decoration-style: solid;
+    text-decoration-color: var(--status-current);
+  }
+
+  .claim-unverified {
+    text-decoration-style: dashed;
+    text-decoration-color: var(--status-unverified);
+  }
+
+  .claim-outdated {
+    text-decoration-style: wavy;
+    text-decoration-color: var(--status-outdated);
+  }
+
+  .claim-incorrect {
+    text-decoration-style: double;
+    text-decoration-color: var(--status-incorrect);
+  }
+
+  .claim-unchecked {
+    text-decoration-style: dotted;
+    text-decoration-color: var(--status-unchecked);
+  }
+}
+
+/* DESIGN.md section 9: with reduced motion, content changes use an 80ms opacity fade only. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-property: opacity !important;
+    transition-duration: 80ms !important;
+    scroll-behavior: auto !important;
+  }
+}

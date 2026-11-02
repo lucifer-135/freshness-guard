@@ -27,3 +27,7 @@ web/dist/
 # Operating system files
 .DS_Store
 Thumbs.db
+
+# Playwright output
+web/test-results/
+web/playwright-report/

@@ -20,6 +20,14 @@ RUN npm ci
 COPY --from=bifrost-src ui/ ./
 RUN npm run build-enterprise
 
+# The Freshness Guard web app, embedded into the plugin with go:embed.
+FROM node:24-alpine AS web
+WORKDIR /web
+COPY web/package.json web/package-lock.json web/.npmrc ./
+RUN npm ci
+COPY web/ ./
+RUN npm run build
+
 FROM ${GO_IMAGE} AS builder
 ENV CGO_ENABLED=1 GOOS=linux GOWORK=off
 WORKDIR /build
@@ -33,6 +41,7 @@ COPY go.mod go.sum ./fg/
 COPY deploy/check-shared-versions.sh ./fg/deploy/
 COPY plugin ./fg/plugin
 COPY internal ./fg/internal
+COPY --from=web /web/dist/ ./fg/internal/webui/static/
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
     bash fg/deploy/check-shared-versions.sh bifrost/transports/bifrost-http fg/plugin
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \

@@ -341,3 +341,20 @@ func TestModelsEndpointListsFakeModels(t *testing.T) {
 	require.Equal(t, http.StatusOK, resp.StatusCode, text)
 	assert.Contains(t, text, "openai/fake-model")
 }
+
+func TestWebAppIsServed(t *testing.T) {
+	waitReady(t)
+	resp := pluginRequest(t, http.MethodGet, "/freshness/ui/", "", false)
+	page := readBody(t, resp)
+	require.Equal(t, http.StatusOK, resp.StatusCode, page)
+	assert.Contains(t, page, `<div id="root">`)
+
+	asset := regexp.MustCompile(`/freshness/ui/assets/[^"]+\.js`).FindString(page)
+	require.NotEmpty(t, asset, page)
+	resp = pluginRequest(t, http.MethodGet, asset, "", false)
+	readBody(t, resp)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	resp = pluginRequest(t, http.MethodGet, "/freshness/ui/chat", "", false)
+	assert.Equal(t, page, readBody(t, resp))
+}
