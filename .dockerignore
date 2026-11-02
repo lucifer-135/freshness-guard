@@ -5,3 +5,4 @@
 !internal
 !test
 !cmd
+!deploy/check-shared-versions.sh

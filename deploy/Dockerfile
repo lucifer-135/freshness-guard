@@ -1,8 +1,11 @@
 # syntax=docker/dockerfile:1
-# Builds Bifrost from source together with the Freshness Guard plugin. Both are
-# compiled in one Go workspace with the same toolchain and flags, because Go
-# plugins only load when every shared package matches exactly. The official
-# Bifrost image cannot be used: it is statically linked and cannot load plugins.
+# Builds Bifrost from source together with the Freshness Guard plugin. Bifrost
+# is built exactly like its official dynamic build (`make build DYNAMIC=1`,
+# documented at docs.getbifrost.ai/plugins/building-dynamic-binary), because
+# custom Go plugins only load into a dynamically linked Bifrost; the official
+# image is statically linked and cannot load them. The plugin is built
+# separately with the same toolchain, and a check stops the build when the two
+# would compile a shared module at different versions.
 #
 # The Bifrost source comes from the extra build context "bifrost-src": a sparse
 # checkout of tag transports/v2.4.0 (folders transports/ and ui/) made on the
@@ -18,21 +21,22 @@ COPY --from=bifrost-src ui/ ./
 RUN npm run build-enterprise
 
 FROM ${GO_IMAGE} AS builder
-ENV CGO_ENABLED=1 GOOS=linux
+ENV CGO_ENABLED=1 GOOS=linux GOWORK=off
 WORKDIR /build
 COPY --from=bifrost-src transports ./bifrost/transports
 COPY --from=ui /app/out ./bifrost/transports/bifrost-http/ui
-# The workspace needs only the plugin's go.mod and go.sum to resolve versions,
-# so Bifrost is built before the plugin sources are copied. A change to the
-# plugin then rebuilds only the plugin.
-COPY go.mod go.sum ./fg/
-RUN go work init ./bifrost/transports ./fg
+# Bifrost is built before the plugin sources are copied, so a change to the
+# plugin rebuilds only the plugin.
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    cd bifrost/transports && go build -trimpath -tags sqlite_static -o /out/bifrost-http ./bifrost-http
+    cd bifrost/transports/bifrost-http && go build -ldflags="-w -s -X main.Version=v2.4.0" -a -trimpath -o /out/bifrost-http .
+COPY go.mod go.sum ./fg/
+COPY deploy/check-shared-versions.sh ./fg/deploy/
 COPY plugin ./fg/plugin
 COPY internal ./fg/internal
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    cd fg && go build -trimpath -tags sqlite_static -buildmode=plugin -o /out/freshness-guard.so ./plugin
+    bash fg/deploy/check-shared-versions.sh bifrost/transports/bifrost-http fg/plugin
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    cd fg && go build -trimpath -buildmode=plugin -o /out/freshness-guard.so ./plugin
 
 FROM debian:trixie-slim AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
