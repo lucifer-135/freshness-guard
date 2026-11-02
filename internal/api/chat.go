@@ -23,6 +23,14 @@ type Credits interface {
 	Daily() int
 }
 
+// Settings are the configured defaults that GET /freshness/status reports, so
+// the web app can start from them and name the real sync time limit.
+type Settings struct {
+	DefaultMode   string `json:"default_mode"`
+	DefaultPolicy string `json:"default_policy"`
+	SyncTimeoutMS int    `json:"sync_timeout_ms"`
+}
+
 const statusModelsTimeout = 2 * time.Second
 
 type chatRequest struct {
@@ -130,5 +138,5 @@ func (h *handler) status(w http.ResponseWriter, r *http.Request) {
 	if h.Credits != nil {
 		credits["used"], credits["budget"] = h.Credits.Used(), h.Credits.Daily()
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"gateway": gw, "credits": credits})
+	writeJSON(w, http.StatusOK, map[string]any{"gateway": gw, "credits": credits, "settings": h.Settings})
 }

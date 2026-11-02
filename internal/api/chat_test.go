@@ -3,6 +3,7 @@ package api_test
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -144,10 +145,38 @@ func TestStatusEndpoint(t *testing.T) {
 	g := &fakeGateway{models: []gateway.Model{{ID: "gemini/a", Provider: "gemini"}}}
 	rec := do(chatHandler(g), http.MethodGet, "/freshness/status", "t", "")
 	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.JSONEq(t, `{"gateway":{"reachable":true,"models":1},"credits":{"used":3,"budget":30}}`, rec.Body.String())
+	assert.JSONEq(t, `{"gateway":{"reachable":true,"models":1},"credits":{"used":3,"budget":30},`+
+		`"settings":{"default_mode":"","default_policy":"","sync_timeout_ms":0}}`, rec.Body.String())
 
 	rec = do(chatHandler(&fakeGateway{modelsErr: errors.New("down")}), http.MethodGet, "/freshness/status", "t", "")
-	assert.JSONEq(t, `{"gateway":{"reachable":false,"models":0},"credits":{"used":3,"budget":30}}`, rec.Body.String())
+	assert.JSONEq(t, `{"gateway":{"reachable":false,"models":0},"credits":{"used":3,"budget":30},`+
+		`"settings":{"default_mode":"","default_policy":"","sync_timeout_ms":0}}`, rec.Body.String())
+}
+
+func TestStatusIncludesSettings(t *testing.T) {
+	h := api.NewHandler(api.Deps{Token: "t", Settings: api.Settings{DefaultMode: "async", DefaultPolicy: "heal", SyncTimeoutMS: 8000}})
+	rec := do(h, http.MethodGet, "/freshness/status", "t", "")
+	require.Equal(t, http.StatusOK, rec.Code)
+	var body struct {
+		Settings json.RawMessage `json:"settings"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.JSONEq(t, `{"default_mode":"async","default_policy":"heal","sync_timeout_ms":8000}`, string(body.Settings))
+}
+
+func TestUIIsPublic(t *testing.T) {
+	ui := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "ui") })
+	h := api.NewHandler(api.Deps{Token: "t", UI: ui})
+	rec := do(h, http.MethodGet, "/freshness/ui/x", "", "")
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "ui", rec.Body.String())
+}
+
+func TestRootRedirectsToUI(t *testing.T) {
+	ui := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
+	rec := do(api.NewHandler(api.Deps{Token: "t", UI: ui}), http.MethodGet, "/", "", "")
+	assert.Equal(t, http.StatusFound, rec.Code)
+	assert.Equal(t, "/freshness/ui/", rec.Header().Get("Location"))
 }
 
 func TestChatRoutesNeedToken(t *testing.T) {

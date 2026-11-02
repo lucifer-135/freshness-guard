@@ -25,6 +25,7 @@ import (
 	"github.com/lucifer-135/freshness-guard/internal/store"
 	"github.com/lucifer-135/freshness-guard/internal/tavily"
 	"github.com/lucifer-135/freshness-guard/internal/verify"
+	"github.com/lucifer-135/freshness-guard/internal/webui"
 )
 
 const (
@@ -92,6 +93,11 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		Token: cfg.APIToken, Reports: st, Jobs: eng, NewID: newID, Now: time.Now,
 		CheckTimeout: api.DefaultCheckTimeout, Logger: logger, Events: broker,
 		Gateway: gateway.New(cfg.BifrostBaseURL, cfg.BifrostVirtualKey), Credits: budget,
+		UI: webui.Handler(webui.Static()),
+		Settings: api.Settings{
+			DefaultMode: cfg.DefaultMode, DefaultPolicy: cfg.DefaultPolicy,
+			SyncTimeoutMS: int(cfg.SyncTimeout / time.Millisecond),
+		},
 	})
 	return &App{
 		Config: cfg,
