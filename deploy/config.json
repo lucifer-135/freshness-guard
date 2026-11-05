@@ -16,6 +16,21 @@
     }
   },
   "vector_store": { "enabled": true, "type": "chromem", "config": {} },
+  "mcp": {
+    "client_configs": [
+      {
+        "name": "freshness_guard",
+        "connection_type": "http",
+        "connection_string": "http://127.0.0.1:8090/freshness/mcp",
+        "auth_type": "headers",
+        "headers": { "X-Freshness-Token": "env.FG_API_TOKEN" },
+        "tools_to_execute": ["*"],
+        "tools_to_auto_execute": [],
+        "allow_by_default": true
+      }
+    ],
+    "tool_manager_config": { "disable_auto_tool_inject": true, "tool_execution_timeout": "45s" }
+  },
   "plugins": [
     {
       "enabled": true,

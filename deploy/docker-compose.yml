@@ -37,6 +37,10 @@ services:
   # Bifrost with test/e2e/config.json: fake models, fake Tavily, plugin API on 8091.
   bifrost-e2e:
     build: *bifrost-build
+    # Read by the MCP client header in test/e2e/config.json, which proves that
+    # Bifrost resolves env. values there; the plugin token itself is literal.
+    environment:
+      FG_API_TOKEN: e2e-token
     volumes:
       - ../test/e2e/config.json:/app/data/config.json:ro
     depends_on:
@@ -70,6 +74,7 @@ services:
       BIFROST_URL: http://bifrost-e2e:8080
       FG_URL: http://bifrost-e2e:8091
       FG_TOKEN: e2e-token
+      FAKE_URL: http://fakeprovider:9000
     command: ["go", "test", "-tags", "e2e", "-count=1", "-v", "./test/e2e/..."]
     depends_on: [bifrost-e2e]
     profiles: ["tools"]

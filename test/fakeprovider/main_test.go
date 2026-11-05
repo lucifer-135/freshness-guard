@@ -222,3 +222,26 @@ func TestEmbeddingsOfTextWithoutLettersAreValid(t *testing.T) {
 	v := embed(t, `{"input":"1234"}`)
 	assert.Equal(t, []float64{1, 0, 0, 0, 0, 0, 0, 0}, v[0])
 }
+
+func toolRequestCount(t *testing.T, h http.Handler) int {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/debug/tool-requests", nil))
+	require.Equal(t, http.StatusOK, rec.Code)
+	var body struct {
+		Count int `json:"count"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	return body.Count
+}
+
+func TestToolRequestsAreCounted(t *testing.T) {
+	h := newHandler()
+	before := toolRequestCount(t, h)
+	plain := `{"model":"fake-model","messages":[{"role":"user","content":"hi"}]}`
+	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(plain)))
+	assert.Equal(t, before, toolRequestCount(t, h))
+	withTools := `{"model":"fake-model","messages":[{"role":"user","content":"hi"}],"tools":[{"type":"function","function":{"name":"x"}}]}`
+	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(withTools)))
+	assert.Equal(t, before+1, toolRequestCount(t, h))
+}

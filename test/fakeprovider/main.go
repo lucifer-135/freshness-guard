@@ -10,6 +10,7 @@ import (
 	"math"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -41,10 +42,15 @@ type message struct {
 }
 
 type chatRequest struct {
-	Model    string    `json:"model"`
-	Stream   bool      `json:"stream"`
-	Messages []message `json:"messages"`
+	Model    string            `json:"model"`
+	Stream   bool              `json:"stream"`
+	Messages []message         `json:"messages"`
+	Tools    []json.RawMessage `json:"tools"`
 }
+
+// toolRequests counts chat requests that arrived with tools. The e2e suite
+// reads it to prove that Bifrost does not inject MCP tools into requests.
+var toolRequests atomic.Int64
 
 func newHandler() http.Handler {
 	mux := http.NewServeMux()
@@ -52,6 +58,10 @@ func newHandler() http.Handler {
 	mux.HandleFunc("GET /v1/models", handleModels)
 	mux.HandleFunc("POST /v1/embeddings", handleEmbeddings)
 	mux.HandleFunc("POST /search", handleSearch)
+	mux.HandleFunc("GET /debug/tool-requests", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprintf(w, `{"count":%d}`, toolRequests.Load())
+	})
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok")) })
 	return mux
 }
@@ -61,6 +71,9 @@ func handleChat(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON body", http.StatusBadRequest)
 		return
+	}
+	if len(req.Tools) > 0 {
+		toolRequests.Add(1)
 	}
 	if req.Model == "" {
 		req.Model = modelID
