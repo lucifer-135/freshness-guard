@@ -37,8 +37,12 @@ export function LiveFeed() {
           Pause live feed
         </Button>
       </div>
-      {frozen && waiting > 0 && (
-        <p className="text-sm text-text-muted">{waiting === 1 ? '1 new report is waiting.' : `${waiting} new reports are waiting.`}</p>
+      {frozen && (
+        // The line exists from the moment of pausing, so a new report changes its
+        // text without moving the list, and the live region announces it.
+        <p role="status" className="min-h-5 text-sm text-text-muted">
+          {waiting === 0 ? '' : waiting === 1 ? '1 new report is waiting.' : `${waiting} new reports are waiting.`}
+        </p>
       )}
       {reports.isPending && <p className="text-text-muted">Loading the reports.</p>}
       {reports.isError && <p className="text-status-outdated">The reports could not be loaded.</p>}

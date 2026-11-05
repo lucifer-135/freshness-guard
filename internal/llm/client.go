@@ -177,6 +177,9 @@ func (c *Client) send(ctx context.Context, req Request, messages []message) (str
 	// out of the semantic cache even when the operator sets a default cache key.
 	httpReq.Header.Set("x-bf-cache-key", internalCacheKey())
 	httpReq.Header.Set("x-bf-cache-no-store", "true")
+	// Without this the cache also runs a semantic search, which embeds the prompt
+	// with the cache's embedding model: one extra provider call per internal call.
+	httpReq.Header.Set("x-bf-cache-type", "direct")
 	if c.virtualKey != "" {
 		httpReq.Header.Set("x-bf-vk", c.virtualKey)
 	}

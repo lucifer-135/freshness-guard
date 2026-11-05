@@ -200,6 +200,9 @@ func TestInternalCallsBypassSemanticCache(t *testing.T) {
 	keys := map[string]bool{}
 	for _, req := range f.requests {
 		assert.Equal(t, "true", req.header.Get("x-bf-cache-no-store"))
+		// A direct lookup is a hash fetch; the default would also embed the prompt
+		// with the cache's embedding model on every internal call.
+		assert.Equal(t, "direct", req.header.Get("x-bf-cache-type"))
 		key := req.header.Get("x-bf-cache-key")
 		assert.True(t, strings.HasPrefix(key, "fg-internal-"), key)
 		keys[key] = true
