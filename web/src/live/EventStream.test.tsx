@@ -3,6 +3,7 @@ import { act, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EventStreamProvider, useConnection } from './EventStream'
+import { feedKey, statsKey } from './keys'
 import { reportKey } from './reportCache'
 import { useReport } from './useReport'
 import { normalizeReport, setToken } from '@/api/client'
@@ -127,5 +128,50 @@ describe('EventStreamProvider', () => {
     expect(screen.getByText('live')).toBeInTheDocument()
     expect(queryClient.getQueryState(reportKey('p'))?.isInvalidated).toBe(true)
     expect(queryClient.getQueryState(reportKey('c'))?.isInvalidated).toBe(false)
+  })
+
+  it('refreshes the dashboard numbers when cached answers are removed, without creating a report', async () => {
+    const queryClient = new QueryClient()
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
+    fake = fakeFetch({
+      'GET /freshness/events': () =>
+        new Response(streamBody([sse(event('cache.purged', 'r9', { cache_ids: ['c1'], count: 1 }))]), {
+          headers: { 'Content-Type': 'text/event-stream' },
+        }),
+    })
+    renderStream(queryClient)
+    await flush()
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: statsKey })
+    expect(queryClient.getQueryData(reportKey('r9'))).toBeUndefined()
+  })
+
+  it('refreshes the dashboard numbers and the live feed when a report completes', async () => {
+    const queryClient = new QueryClient()
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
+    fake = fakeFetch({
+      'GET /freshness/events': () =>
+        new Response(
+          streamBody([
+            sse(
+              event('report.complete', 'r9', {
+                status: 'complete',
+                score: 72,
+                stale_count: 1,
+                checked_count: 2,
+                total_claims: 2,
+                healed_count: 0,
+                blocked: false,
+                latency_ms: 1000,
+                credits_used: 2,
+              }),
+            ),
+          ]),
+          { headers: { 'Content-Type': 'text/event-stream' } },
+        ),
+    })
+    renderStream(queryClient)
+    await flush()
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: statsKey })
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: feedKey })
   })
 })

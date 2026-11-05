@@ -102,7 +102,8 @@ interface EventBase {
   at: string
 }
 
-export type LiveEvent =
+// ReportEvent is an event that changes one report.
+export type ReportEvent =
   | (EventBase & { type: 'report.started'; data: { model: string; provider: string; mode: string; policy: string } })
   | (EventBase & { type: 'report.claims'; data: { claims: Claim[] } })
   | (EventBase & { type: 'claim.verdict'; data: { claim: Claim } })
@@ -121,3 +122,43 @@ export type LiveEvent =
       }
     })
   | (EventBase & { type: 'report.error'; data: { reason: string } })
+
+// CachePurgedEvent says cached answers were removed from the semantic cache.
+// Its report_id is the report that caused it.
+export type CachePurgedEvent = EventBase & { type: 'cache.purged'; data: { cache_ids: string[]; count: number } }
+
+export type LiveEvent = ReportEvent | CachePurgedEvent
+
+export interface Counts {
+  checked: number
+  outdated: number
+  incorrect: number
+}
+
+export interface LeaderboardRow {
+  model: string
+  provider: string
+  total: Counts
+  cells: Partial<Record<Category, Counts>>
+}
+
+export interface Leaderboard {
+  window_days: number
+  since: string
+  min_sample: number
+  rows: LeaderboardRow[]
+}
+
+export interface Summary {
+  window_hours: number
+  answers: number
+  checked_claims: number
+  outdated_claims: number
+  incorrect_claims: number
+  cache_purges: number
+  cache_purge_enabled: boolean
+  credits: { used: number; budget: number }
+}
+
+export type Metric = 'outdated' | 'incorrect'
+export type StatsWindow = '7d' | '30d'

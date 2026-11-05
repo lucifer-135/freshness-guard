@@ -91,8 +91,8 @@ export function event<T extends LiveEvent['type']>(
   type: T,
   reportId: string,
   data: Extract<LiveEvent, { type: T }>['data'],
-): LiveEvent {
-  return { id: nextEventId++, type, report_id: reportId, at: '2026-11-01T18:42:00Z', data } as LiveEvent
+): Extract<LiveEvent, { type: T }> {
+  return { id: nextEventId++, type, report_id: reportId, at: '2026-11-01T18:42:00Z', data } as Extract<LiveEvent, { type: T }>
 }
 
 export function sse(e: LiveEvent): string {

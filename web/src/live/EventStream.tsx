@@ -1,5 +1,6 @@
 import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { feedKey, statsKey } from './keys'
 import { applyEvent, reportKey } from './reportCache'
 import { ApiError, apiFetch } from '@/api/client'
 import { readSSE } from '@/api/sse'
@@ -13,10 +14,17 @@ const ConnectionContext = createContext<Connection>('connecting')
 const RECONNECT_DELAYS_MS = [1000, 2000, 5000, 10000]
 
 function apply(queryClient: QueryClient, e: LiveEvent) {
+  // Removing cached answers changes the dashboard numbers, not any report.
+  if (e.type === 'cache.purged') {
+    void queryClient.invalidateQueries({ queryKey: statsKey })
+    return
+  }
   queryClient.setQueryData<Report>(reportKey(e.report_id), (prev) => applyEvent(prev, e))
   // Events carry no answer text or corrected text; load the stored report.
   if (e.type === 'report.complete' || e.type === 'report.error') {
     void queryClient.invalidateQueries({ queryKey: reportKey(e.report_id) })
+    void queryClient.invalidateQueries({ queryKey: statsKey })
+    void queryClient.invalidateQueries({ queryKey: feedKey })
   }
 }
 

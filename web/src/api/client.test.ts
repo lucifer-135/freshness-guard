@@ -1,5 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, apiFetch, apiJSON, clearToken, getReport, getToken, setToken, setUnauthorizedHandler } from './client'
+import {
+  ApiError,
+  apiFetch,
+  apiJSON,
+  clearToken,
+  getLeaderboard,
+  getReport,
+  getSummary,
+  getToken,
+  setToken,
+  setUnauthorizedHandler,
+} from './client'
 import { fakeFetch, json, type FakeFetch } from '@/test/fakeFetch'
 
 describe('plugin API client', () => {
@@ -61,5 +72,30 @@ describe('plugin API client', () => {
       throw new Error('blocked')
     })
     expect(getToken()).toBeNull()
+  })
+
+  it('requests the leaderboard for the chosen window with the token', async () => {
+    setToken('t1')
+    const body = { window_days: 30, since: '2026-10-06T00:00:00Z', min_sample: 10, rows: [] }
+    fake = fakeFetch({ 'GET /freshness/leaderboard': () => json(200, body) })
+    expect(await getLeaderboard('30d')).toEqual(body)
+    expect(fake.requests[0].url.search).toBe('?window=30d')
+    expect(fake.requests[0].headers.get('Authorization')).toBe('Bearer t1')
+  })
+
+  it('requests the summary', async () => {
+    setToken('t1')
+    const body = {
+      window_hours: 24,
+      answers: 3,
+      checked_claims: 6,
+      outdated_claims: 2,
+      incorrect_claims: 0,
+      cache_purges: 1,
+      cache_purge_enabled: true,
+      credits: { used: 4, budget: 200 },
+    }
+    fake = fakeFetch({ 'GET /freshness/summary': () => json(200, body) })
+    expect(await getSummary()).toEqual(body)
   })
 })

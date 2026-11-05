@@ -1,4 +1,4 @@
-import type { Claim, Model, PluginStatus, Report } from './types'
+import type { Claim, Leaderboard, Model, PluginStatus, Report, StatsWindow, Summary } from './types'
 
 const TOKEN_KEY = 'fg.token'
 
@@ -164,4 +164,12 @@ export async function getModels(): Promise<Model[]> {
 
 export function getStatus(): Promise<PluginStatus> {
   return apiJSON<PluginStatus>('/freshness/status')
+}
+
+export function getLeaderboard(window: StatsWindow): Promise<Leaderboard> {
+  return apiJSON<Leaderboard>(`/freshness/leaderboard?window=${window}`)
+}
+
+export function getSummary(): Promise<Summary> {
+  return apiJSON<Summary>('/freshness/summary')
 }

@@ -1,5 +1,5 @@
 import { normalizeClaim, normalizeReport } from '@/api/client'
-import type { LiveEvent, Report } from '@/api/types'
+import type { Report, ReportEvent } from '@/api/types'
 
 // Reports live in the TanStack Query cache under this key, written by both the
 // event stream and API fetches.
@@ -9,7 +9,7 @@ function finished(r: Report): boolean {
   return r.status === 'complete' || r.status === 'error'
 }
 
-export function applyEvent(prev: Report | undefined, e: LiveEvent): Report {
+export function applyEvent(prev: Report | undefined, e: ReportEvent): Report {
   const base = prev ?? normalizeReport({ id: e.report_id, created_at: e.at })
   switch (e.type) {
     case 'report.started':
