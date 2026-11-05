@@ -9,7 +9,8 @@ export const routes: RouteObject[] = [
     children: [
       { index: true, element: <Navigate to="/chat" replace /> },
       { path: 'chat', element: <ChatPage /> },
-      // The report pages are split into their own chunks (DESIGN.md section 10).
+      // The dashboard and the report pages are split into their own chunks (DESIGN.md section 10).
+      { path: 'dashboard', lazy: async () => ({ Component: (await import('@/dashboard/DashboardPage')).DashboardPage }) },
       { path: 'reports', lazy: async () => ({ Component: (await import('@/reports/ReportsPage')).ReportsPage }) },
       { path: 'reports/:id', lazy: async () => ({ Component: (await import('@/reports/ReportPage')).ReportPage }) },
       { path: '*', element: <NotFound /> },

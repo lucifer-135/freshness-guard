@@ -1,4 +1,5 @@
 import type { Category, Counts, Leaderboard, LeaderboardRow, Metric } from '@/api/types'
+import { percent } from '@/claims/format'
 
 // The categories in the order of the heatmap's columns.
 export const CATEGORY_ORDER: Category[] = ['pricing', 'version', 'leadership', 'law', 'statistic', 'event', 'feature', 'static']
@@ -17,7 +18,6 @@ export function isLowSample(c: Counts, minSample: number): boolean {
   return c.checked < minSample
 }
 
-const percent = (value: number) => `${Math.round(value * 100)}%`
 const claimsOf = (n: number) => `${n} checked claim${n === 1 ? '' : 's'}`
 const capitalized = (metric: Metric) => metric.charAt(0).toUpperCase() + metric.slice(1)
 

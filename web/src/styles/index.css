@@ -224,3 +224,24 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* DESIGN.md section 4.2: a faint light that follows the cursor across a card.
+   SpotlightCard sets --spot, --mx and --my; without them the light stays off. */
+.spotlight-card {
+  position: relative;
+}
+
+.spotlight-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: var(--spot, 0);
+  transition: opacity var(--dur-hover);
+  background: radial-gradient(
+    320px circle at var(--mx, 50%) var(--my, 50%),
+    color-mix(in oklab, var(--accent) 8%, transparent),
+    transparent 70%
+  );
+}

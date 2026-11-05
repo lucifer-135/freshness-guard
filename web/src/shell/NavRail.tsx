@@ -1,10 +1,11 @@
-import { FileText, MessageSquare, ShieldCheck } from 'lucide-react'
+import { FileText, LayoutDashboard, MessageSquare, ShieldCheck } from 'lucide-react'
 import { NavLink } from 'react-router'
 import { cn } from '@/lib/utils'
 
-// Only pages that exist are listed; the dashboard and the other pages arrive in M3.
+// Only pages that exist are listed; the facts, watchlist and settings pages are not built yet.
 const items = [
   { to: '/chat', label: 'Chat', icon: MessageSquare },
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/reports', label: 'Reports', icon: FileText },
 ]
 
