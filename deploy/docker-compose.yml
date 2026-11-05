@@ -48,6 +48,35 @@ services:
         condition: service_healthy
     profiles: ["tools"]
 
+  # Real models and a fresh database on every start (no volume), for the
+  # curated benchmark. The credit budget is 1000 so that the governor never
+  # raises the risk threshold during a run.
+  bifrost-bench:
+    build: *bifrost-build
+    ports: ["127.0.0.1:8092:8090"]
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ../bench/config.json:/app/data/config.json:ro
+    profiles: ["bench"]
+
+  freshbench:
+    image: golang:1.27.3-trixie
+    working_dir: /src
+    volumes:
+      - ..:/src
+      - gomodcache:/go/pkg/mod
+      - gobuildcache:/root/.cache/go-build
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      FG_URL: http://bifrost-bench:8090
+      BIFROST_URL: http://bifrost-e2e:8080
+    entrypoint: ["go", "run", "./cmd/freshbench"]
+    profiles: ["tools", "bench"]
+
   fakeprovider:
     image: golang:1.27.3-trixie
     working_dir: /src
