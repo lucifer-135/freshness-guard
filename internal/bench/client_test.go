@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -169,4 +171,50 @@ func TestRescoreUsesNewLabels(t *testing.T) {
 	_, err = Rescore(run, items[:1])
 	require.Error(t, err, "an outcome whose item is not in the dataset")
 	assert.Contains(t, err.Error(), "b")
+}
+
+func TestCheckPaceSpacesChecksApart(t *testing.T) {
+	var starts []time.Time
+	var mu sync.Mutex
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		starts = append(starts, time.Now())
+		mu.Unlock()
+		writeJSON(w, http.StatusOK, report.Report{ID: "r1", Status: report.StatusComplete})
+	}))
+	defer srv.Close()
+	c := newClient(srv.URL)
+	c.Pace = 80 * time.Millisecond
+
+	var wg sync.WaitGroup
+	for i := 0; i < 3; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := c.Check(context.Background(), "x")
+			assert.NoError(t, err)
+		}()
+	}
+	wg.Wait()
+
+	require.Len(t, starts, 3)
+	sort.Slice(starts, func(i, j int) bool { return starts[i].Before(starts[j]) })
+	assert.GreaterOrEqual(t, starts[1].Sub(starts[0]), 70*time.Millisecond)
+	assert.GreaterOrEqual(t, starts[2].Sub(starts[1]), 70*time.Millisecond)
+}
+
+func TestCheckPaceStopsWaitingWhenContextEnds(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, report.Report{ID: "r1", Status: report.StatusComplete})
+	}))
+	defer srv.Close()
+	c := newClient(srv.URL)
+	c.Pace = time.Hour
+	_, err := c.Check(context.Background(), "first")
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	_, err = c.Check(ctx, "second")
+	require.Error(t, err)
 }

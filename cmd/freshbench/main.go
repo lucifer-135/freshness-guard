@@ -1,7 +1,7 @@
 // Command freshbench scores Freshness Guard on the curated set and measures
 // what async mode adds to a request.
 //
-//	freshbench curated  -dataset bench/curated.json -out bench/results -name curated
+//	freshbench curated  -dataset bench/curated.json -out bench/results -name curated [-pace 30s]
 //	freshbench score    -results bench/results/curated-DATE.json -dataset bench/curated.json -out bench/results
 //	freshbench overhead -n 1000 -warmup 100 -model openai/fake-model -out bench/results
 //
@@ -72,13 +72,14 @@ func curated(ctx context.Context, args []string) error {
 	name := fs.String("name", "curated", "name of the run")
 	concurrency := fs.Int("concurrency", 2, "checks in flight at once")
 	note := fs.String("note", "", "models and setup, written into the report")
+	pace := fs.Duration("pace", 0, "least time between the starts of two checks, for keys with a tokens-per-minute limit")
 	_ = fs.Parse(args)
 
 	items, err := loadItems(*dataset)
 	if err != nil {
 		return err
 	}
-	client := &bench.APIClient{BaseURL: env("FG_URL"), Token: env("FG_TOKEN", "FG_API_TOKEN"), PollEvery: 2 * time.Second, Deadline: 5 * time.Minute}
+	client := &bench.APIClient{BaseURL: env("FG_URL"), Token: env("FG_TOKEN", "FG_API_TOKEN"), PollEvery: 2 * time.Second, Deadline: 5 * time.Minute, Pace: *pace}
 	if client.BaseURL == "" || client.Token == "" {
 		return errors.New("set FG_URL and FG_TOKEN (or FG_API_TOKEN)")
 	}

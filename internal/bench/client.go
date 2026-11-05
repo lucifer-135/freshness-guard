@@ -24,6 +24,34 @@ type APIClient struct {
 	// PollEvery is the wait between polls of a pending report, and between
 	// tries while the queue is full. Deadline bounds one check.
 	PollEvery, Deadline time.Duration
+	// Pace is the least time between the starts of two checks, shared by all
+	// goroutines. Free-tier model keys allow only a few thousand tokens a
+	// minute, so a benchmark must not start checks faster than that.
+	Pace time.Duration
+
+	paceMu    sync.Mutex
+	nextStart time.Time
+}
+
+// waitForTurn blocks until Pace has passed since the previous check started.
+func (c *APIClient) waitForTurn(ctx context.Context) error {
+	if c.Pace <= 0 {
+		return nil
+	}
+	c.paceMu.Lock()
+	now := time.Now()
+	start := c.nextStart
+	if start.Before(now) {
+		start = now
+	}
+	c.nextStart = start.Add(c.Pace)
+	c.paceMu.Unlock()
+	select {
+	case <-time.After(time.Until(start)):
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func (c *APIClient) http() *http.Client {
@@ -58,6 +86,9 @@ func apiError(status int, body []byte) string {
 // Check sends text to POST /freshness/check and returns the finished report,
 // polling the report while the API says it is still pending.
 func (c *APIClient) Check(ctx context.Context, text string) (report.Report, error) {
+	if err := c.waitForTurn(ctx); err != nil {
+		return report.Report{}, fmt.Errorf("waiting for a turn: %w", err)
+	}
 	if c.Deadline > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, c.Deadline)
