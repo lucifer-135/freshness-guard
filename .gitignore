@@ -31,3 +31,6 @@ Thumbs.db
 # Playwright output
 web/test-results/
 web/playwright-report/
+
+# README screenshots (taken by web/e2e/screenshots.spec.ts)
+web/docs-images/

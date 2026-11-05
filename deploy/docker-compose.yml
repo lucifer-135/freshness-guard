@@ -119,7 +119,7 @@ services:
     environment:
       FG_URL: http://bifrost-e2e:8091
       FG_TOKEN: e2e-token
-    command: ["sh", "-c", "npm ci && npx playwright test"]
+    command: ["sh", "-c", "npm ci && npx playwright test --project=chromium"]
     depends_on: [bifrost-e2e]
     profiles: ["tools"]
 
