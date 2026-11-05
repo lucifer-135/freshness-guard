@@ -6,6 +6,7 @@
 !test
 !cmd
 !deploy/check-shared-versions.sh
+!deploy/hosted/config.json
 !web
 web/node_modules
 web/dist

@@ -58,3 +58,14 @@ jobs:
       - name: Show the gateway log
         if: failure()
         run: docker compose -f deploy/docker-compose.yml logs bifrost-e2e
+
+  # Builds the image the way Hugging Face Spaces does: no bifrost-src context, so
+  # the Dockerfile clones Bifrost itself.
+  hosted-image:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build the hosted image
+        run: docker build -f deploy/Dockerfile -t fg-hosted .
