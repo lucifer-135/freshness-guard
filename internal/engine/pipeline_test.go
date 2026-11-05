@@ -421,3 +421,12 @@ func TestRunBlocksOnlySyncRequests(t *testing.T) {
 	job.Mode, job.Policy = "async", "block"
 	assert.False(t, p.Run(context.Background(), job).Blocked, "async answers are never blocked")
 }
+
+func TestRunCopiesCacheFieldsFromJob(t *testing.T) {
+	job := baseJob
+	job.CacheID, job.CacheHit = "cache-1", true
+	r := newPipeline(&fakeExtractor{claims: twoClaims()}, &fakeVerifier{edit: markStale, credit: 1}, &fakeFacts{}, &fakeReports{}, 30).
+		Run(context.Background(), job)
+	assert.Equal(t, "cache-1", r.CacheID)
+	assert.True(t, r.CacheHit)
+}

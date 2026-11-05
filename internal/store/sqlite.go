@@ -136,18 +136,18 @@ func (s *SQLite) SaveReport(ctx context.Context, r report.Report) error {
 
 	_, err = tx.ExecContext(ctx, `INSERT INTO reports (id, created_at, model, provider, virtual_key, mode, status, reason,
 		prompt, answer_text, score, stale_count, checked_count, total_claims, latency_ms, credits_used,
-		policy, healed_text, healed_count, blocked, model_age_days)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		policy, healed_text, healed_count, blocked, model_age_days, cache_id, cache_hit)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET created_at = excluded.created_at, model = excluded.model,
 		provider = excluded.provider, virtual_key = excluded.virtual_key, mode = excluded.mode, status = excluded.status,
 		reason = excluded.reason, prompt = excluded.prompt, answer_text = excluded.answer_text, score = excluded.score,
 		stale_count = excluded.stale_count, checked_count = excluded.checked_count, total_claims = excluded.total_claims,
 		latency_ms = excluded.latency_ms, credits_used = excluded.credits_used, policy = excluded.policy,
 		healed_text = excluded.healed_text, healed_count = excluded.healed_count, blocked = excluded.blocked,
-		model_age_days = excluded.model_age_days`,
+		model_age_days = excluded.model_age_days, cache_id = excluded.cache_id, cache_hit = excluded.cache_hit`,
 		r.ID, formatTime(r.CreatedAt), r.Model, r.Provider, HashVirtualKey(r.VirtualKey), r.Mode, string(r.Status), r.Reason,
 		r.Prompt, r.AnswerText, nullInt(r.Score), r.StaleCount, r.CheckedCount, r.TotalClaims, r.LatencyMS, r.CreditsUsed,
-		r.Policy, r.HealedText, r.HealedCount, r.Blocked, r.ModelAgeDays)
+		r.Policy, r.HealedText, r.HealedCount, r.Blocked, r.ModelAgeDays, r.CacheID, r.CacheHit)
 	if err != nil {
 		return fmt.Errorf("save report: %w", err)
 	}
@@ -189,7 +189,7 @@ func (s *SQLite) SaveReport(ctx context.Context, r report.Report) error {
 
 const reportColumns = `id, created_at, model, provider, virtual_key, mode, status, reason, prompt, answer_text, score,
 	stale_count, checked_count, total_claims, latency_ms, credits_used, policy, healed_text, healed_count, blocked,
-	model_age_days`
+	model_age_days, cache_id, cache_hit`
 
 type scanner interface{ Scan(dest ...any) error }
 
@@ -202,7 +202,7 @@ func scanReport(row scanner) (report.Report, error) {
 	)
 	err := row.Scan(&r.ID, &created, &r.Model, &r.Provider, &r.VirtualKey, &r.Mode, &status, &r.Reason, &r.Prompt,
 		&r.AnswerText, &score, &r.StaleCount, &r.CheckedCount, &r.TotalClaims, &r.LatencyMS, &r.CreditsUsed,
-		&r.Policy, &r.HealedText, &r.HealedCount, &r.Blocked, &r.ModelAgeDays)
+		&r.Policy, &r.HealedText, &r.HealedCount, &r.Blocked, &r.ModelAgeDays, &r.CacheID, &r.CacheHit)
 	if err != nil {
 		return r, err
 	}

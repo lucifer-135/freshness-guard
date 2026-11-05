@@ -5,6 +5,8 @@ package llm
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -170,6 +172,11 @@ func (c *Client) send(ctx context.Context, req Request, messages []message) (str
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set(HeaderFreshness, "off")
+	// A unique partition key means a lookup can never match another entry, and
+	// no-store keeps the reply out of the cache, so the plugin's own calls stay
+	// out of the semantic cache even when the operator sets a default cache key.
+	httpReq.Header.Set("x-bf-cache-key", internalCacheKey())
+	httpReq.Header.Set("x-bf-cache-no-store", "true")
 	if c.virtualKey != "" {
 		httpReq.Header.Set("x-bf-vk", c.virtualKey)
 	}
@@ -202,4 +209,14 @@ func (c *Client) send(ctx context.Context, req Request, messages []message) (str
 		return "", fmt.Errorf("model %s returned no choices", req.Model)
 	}
 	return reply.Choices[0].Message.Content, nil
+}
+
+// internalCacheKey returns a fresh cache partition key for one internal call.
+func internalCacheKey() string {
+	var b [8]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		// crypto/rand does not fail in practice; the clock keeps keys distinct if it does.
+		return fmt.Sprintf("fg-internal-%x", time.Now().UnixNano())
+	}
+	return "fg-internal-" + hex.EncodeToString(b[:])
 }

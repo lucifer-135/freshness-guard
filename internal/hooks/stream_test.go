@@ -136,3 +136,18 @@ func TestPanicInPostLLMDoesNotDeadlock(t *testing.T) {
 		assert.Equal(t, "error", md.Header("X-Freshness-Status"))
 	}
 }
+
+func TestStreamRecordsCacheIDFromAnyChunk(t *testing.T) {
+	jobs := &fakeSubmitter{}
+	ctx, post := startStream(jobs, nil)
+	post(chunk("Example "))
+	cacheID := "cache-2"
+	tagged := chunk("Cloud")
+	tagged.ChatResponse.ExtraFields.CacheDebug = &schemas.BifrostCacheMetadata{CacheID: &cacheID}
+	post(tagged)
+	ctx.SetValue(schemas.BifrostContextKeyStreamEndIndicator, true)
+	post(chunk(""))
+
+	require.Len(t, jobs.jobs, 1)
+	assert.Equal(t, "cache-2", jobs.jobs[0].CacheID)
+}

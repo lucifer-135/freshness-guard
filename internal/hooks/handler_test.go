@@ -246,3 +246,35 @@ func TestHooksWithoutStateDoNothing(t *testing.T) {
 	assert.Empty(t, jobs.jobs)
 	assert.Empty(t, md.Header("X-Freshness-Status"))
 }
+
+func cachedResponse(content *schemas.ChatMessageContent, cacheID string, hit bool) *schemas.BifrostResponse {
+	resp := chatResponse(content)
+	resp.ChatResponse.ExtraFields.CacheDebug = &schemas.BifrostCacheMetadata{CacheID: &cacheID, CacheHit: hit}
+	return resp
+}
+
+func TestPostLLMRecordsCacheID(t *testing.T) {
+	jobs := &fakeSubmitter{}
+	h := newHandler(jobs)
+	ctx := newCtx()
+	h.TransportPre(ctx, &schemas.HTTPRequest{})
+	h.PreLLM(ctx, chatRequest(schemas.ChatCompletionRequest))
+	h.PostLLM(ctx, cachedResponse(&schemas.ChatMessageContent{ContentStr: str(testAnswer)}, "cache-1", true))
+
+	require.Len(t, jobs.jobs, 1)
+	assert.Equal(t, "cache-1", jobs.jobs[0].CacheID)
+	assert.True(t, jobs.jobs[0].CacheHit)
+}
+
+func TestPostLLMWithoutCacheMetadataHasNoCacheID(t *testing.T) {
+	jobs := &fakeSubmitter{}
+	h := newHandler(jobs)
+	ctx := newCtx()
+	h.TransportPre(ctx, &schemas.HTTPRequest{})
+	h.PreLLM(ctx, chatRequest(schemas.ChatCompletionRequest))
+	h.PostLLM(ctx, chatResponse(&schemas.ChatMessageContent{ContentStr: str(testAnswer)}))
+
+	require.Len(t, jobs.jobs, 1)
+	assert.Empty(t, jobs.jobs[0].CacheID)
+	assert.False(t, jobs.jobs[0].CacheHit)
+}

@@ -186,3 +186,23 @@ func TestCompleteRejectsHugeReply(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "too large")
 }
+
+func TestInternalCallsBypassSemanticCache(t *testing.T) {
+	f := &fakeServer{replies: []string{"ok"}}
+	srv := f.start(t)
+	client := llm.New(srv.URL, "")
+	for range 2 {
+		_, err := client.Complete(context.Background(), llm.Request{Model: "groq/x", User: "u"})
+		require.NoError(t, err)
+	}
+
+	require.Len(t, f.requests, 2)
+	keys := map[string]bool{}
+	for _, req := range f.requests {
+		assert.Equal(t, "true", req.header.Get("x-bf-cache-no-store"))
+		key := req.header.Get("x-bf-cache-key")
+		assert.True(t, strings.HasPrefix(key, "fg-internal-"), key)
+		keys[key] = true
+	}
+	assert.Len(t, keys, 2, "each call needs its own cache key")
+}

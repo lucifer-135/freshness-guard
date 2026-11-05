@@ -25,7 +25,10 @@ type Job struct {
 	VirtualKey string
 	Mode       string
 	Policy     string
-	At         time.Time
+	// CacheID and CacheHit come from Bifrost's semantic cache metadata.
+	CacheID  string
+	CacheHit bool
+	At       time.Time
 }
 
 // Extractor finds the claims in an answer.
@@ -91,7 +94,7 @@ func (p *Pipeline) Run(ctx context.Context, job Job) (r report.Report) {
 	r = report.Report{
 		ID: job.ReportID, CreatedAt: job.At, Model: job.Model, Provider: job.Provider, VirtualKey: job.VirtualKey,
 		Mode: job.Mode, Policy: job.Policy, Status: report.StatusPending, Prompt: job.Prompt, AnswerText: job.Answer,
-		Claims: []report.Claim{},
+		CacheID: job.CacheID, CacheHit: job.CacheHit, Claims: []report.Claim{},
 	}
 	defer func() {
 		if v := recover(); v != nil {

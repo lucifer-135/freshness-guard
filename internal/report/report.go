@@ -74,7 +74,11 @@ type Report struct {
 	HealedCount  int       `json:"healed_count"`
 	Blocked      bool      `json:"blocked"`
 	ModelAgeDays int       `json:"model_age_days"`
-	Claims       []Claim   `json:"claims"`
+	// CacheID is the semantic cache entry that holds this answer; empty when
+	// the answer was not cached. CacheHit says Bifrost served it from the cache.
+	CacheID  string  `json:"cache_id"`
+	CacheHit bool    `json:"cache_hit"`
+	Claims   []Claim `json:"claims"`
 }
 
 // ScoreParts are the factors of a FRESH claim's score: evidence recency,

@@ -72,7 +72,7 @@ func TestOpenAppliesMigrationsOnce(t *testing.T) {
 	defer db.Close()
 	var version int
 	require.NoError(t, db.QueryRow("PRAGMA user_version").Scan(&version))
-	assert.Equal(t, 2, version)
+	assert.Equal(t, 3, version)
 }
 
 func TestSaveAndGetReportRoundTrip(t *testing.T) {
@@ -276,5 +276,23 @@ func TestMigrationUpgradesM1Database(t *testing.T) {
 	defer db.Close()
 	var version int
 	require.NoError(t, db.QueryRow("PRAGMA user_version").Scan(&version))
-	assert.Equal(t, 2, version)
+	assert.Equal(t, 3, version)
+}
+
+func TestSaveReportKeepsCacheFields(t *testing.T) {
+	s, _ := openStore(t)
+	r := sampleReport("r1", time.Now().UTC())
+	r.CacheID, r.CacheHit = "cache-1", true
+	require.NoError(t, s.SaveReport(ctx, r))
+
+	got, err := s.GetReport(ctx, "r1")
+	require.NoError(t, err)
+	assert.Equal(t, "cache-1", got.CacheID)
+	assert.True(t, got.CacheHit)
+
+	list, err := s.ListReports(ctx, store.ListFilter{})
+	require.NoError(t, err)
+	require.Len(t, list, 1)
+	assert.Equal(t, "cache-1", list[0].CacheID)
+	assert.True(t, list[0].CacheHit)
 }

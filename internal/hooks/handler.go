@@ -39,6 +39,10 @@ type State struct {
 	// streaming requests collect their chunks in buf until the last one.
 	streaming bool
 	buf       strings.Builder
+
+	// cacheID is the semantic cache entry of the answer, from any chunk.
+	cacheID  string
+	cacheHit bool
 }
 
 // Submitter queues verification jobs; *engine.Engine implements it.
@@ -236,6 +240,11 @@ func (h *Handler) plan(ctx *schemas.BifrostContext, st *State, resp *schemas.Bif
 	if st.Mode == ModeOff || st.Status != "" {
 		return postPlan{}
 	}
+	// Bifrost sets the cache metadata on responses, and for streams on a chunk
+	// that need not be the last, so every chunk is looked at.
+	if id, hit := cacheInfo(resp); id != "" {
+		st.cacheID, st.cacheHit = id, hit
+	}
 	if st.streaming {
 		st.buf.WriteString(deltaText(resp))
 		if end, _ := ctx.Value(schemas.BifrostContextKeyStreamEndIndicator).(bool); !end {
@@ -250,7 +259,7 @@ func (h *Handler) plan(ctx *schemas.BifrostContext, st *State, resp *schemas.Bif
 		st.Status = StatusPending
 		return postPlan{submit: true, streaming: true, job: engine.Job{
 			ReportID: st.ReportID, Answer: answer, Prompt: st.Prompt, Model: st.Model, Provider: st.Provider,
-			VirtualKey: st.VirtualKey, Mode: string(ModeAsync), At: h.Now(),
+			VirtualKey: st.VirtualKey, Mode: string(ModeAsync), CacheID: st.cacheID, CacheHit: st.cacheHit, At: h.Now(),
 		}}
 	}
 	answer := answerText(resp)
@@ -259,7 +268,8 @@ func (h *Handler) plan(ctx *schemas.BifrostContext, st *State, resp *schemas.Bif
 	}
 	return postPlan{submit: true, mode: st.Mode, policy: st.Policy, job: engine.Job{
 		ReportID: st.ReportID, Answer: answer, Prompt: st.Prompt, Model: st.Model, Provider: st.Provider,
-		VirtualKey: st.VirtualKey, Mode: string(st.Mode), Policy: string(st.Policy), At: h.Now(),
+		VirtualKey: st.VirtualKey, Mode: string(st.Mode), Policy: string(st.Policy), CacheID: st.cacheID, CacheHit: st.cacheHit,
+		At: h.Now(),
 	}}
 }
 
@@ -388,4 +398,17 @@ func messageText(c *schemas.ChatMessageContent) string {
 		}
 	}
 	return strings.Join(parts, "\n")
+}
+
+// cacheInfo returns the semantic cache entry ID and hit flag Bifrost attached
+// to a response, or "" when the response carries none.
+func cacheInfo(resp *schemas.BifrostResponse) (string, bool) {
+	if resp == nil || resp.ChatResponse == nil {
+		return "", false
+	}
+	meta := resp.ChatResponse.ExtraFields.CacheDebug
+	if meta == nil || meta.CacheID == nil {
+		return "", false
+	}
+	return *meta.CacheID, meta.CacheHit
 }
