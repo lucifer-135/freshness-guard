@@ -1,0 +1,73 @@
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { createMemoryRouter } from 'react-router'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { AppProviders } from '@/App'
+import { routes } from '@/app/routes'
+import { clearToken, getToken, setToken } from '@/api/client'
+import { fakeFetch, json, streamBody, type FakeFetch, type Route } from '@/test/fakeFetch'
+
+function status(reachable: boolean, models: number) {
+  return json(200, {
+    gateway: { reachable, models },
+    credits: { used: 12, budget: 200 },
+    settings: { default_mode: 'async', default_policy: 'heal', sync_timeout_ms: 8000 },
+  })
+}
+
+// The event stream ends at once, so the shell shows that it is reconnecting.
+const endedStream: Route = () => new Response(streamBody([]), { headers: { 'Content-Type': 'text/event-stream' } })
+
+function renderAt(path: string) {
+  return render(<AppProviders router={createMemoryRouter(routes, { initialEntries: [path] })} />)
+}
+
+describe('AppShell', () => {
+  let fake: FakeFetch
+  beforeEach(() => {
+    clearToken()
+    setToken('t1')
+  })
+  afterEach(() => fake?.restore())
+
+  it('starts with a skip link and marks the current page', async () => {
+    fake = fakeFetch({ 'GET /freshness/status': () => status(true, 9), 'GET /freshness/events': endedStream })
+    renderAt('/chat')
+    await userEvent.tab()
+    const skip = screen.getByRole('link', { name: 'Skip to main content' })
+    expect(skip).toHaveFocus()
+    expect(skip).toHaveAttribute('href', '#main')
+    expect(screen.getByRole('link', { name: 'Chat' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: 'Reports' })).not.toHaveAttribute('aria-current')
+  })
+
+  it('shows gateway status, credits and the live connection', async () => {
+    fake = fakeFetch({ 'GET /freshness/status': () => status(true, 9), 'GET /freshness/events': endedStream })
+    renderAt('/chat')
+    expect(await screen.findByText('Connected to Bifrost, 9 models available.')).toBeInTheDocument()
+    expect(screen.getByText('Tavily credits today: 12 of 200')).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Tavily credits today: 12 of 200' })).toBeInTheDocument()
+    expect(await screen.findByText('Reconnecting')).toBeInTheDocument()
+  })
+
+  it('says when Bifrost cannot be reached', async () => {
+    fake = fakeFetch({ 'GET /freshness/status': () => status(false, 0), 'GET /freshness/events': endedStream })
+    renderAt('/chat')
+    expect(await screen.findByText('Bifrost could not be reached.')).toBeInTheDocument()
+  })
+
+  it('signs out', async () => {
+    fake = fakeFetch({ 'GET /freshness/status': () => status(true, 9), 'GET /freshness/events': endedStream })
+    renderAt('/chat')
+    await userEvent.click(screen.getByRole('button', { name: 'Sign out' }))
+    expect(getToken()).toBeNull()
+    expect(screen.getByRole('heading', { level: 1, name: 'Connect to Freshness Guard' })).toBeInTheDocument()
+  })
+
+  it('shows a not-found page', () => {
+    fake = fakeFetch({ 'GET /freshness/status': () => status(true, 9), 'GET /freshness/events': endedStream })
+    renderAt('/nowhere')
+    expect(screen.getByText('This page does not exist.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Go to the chat' })).toBeInTheDocument()
+  })
+})

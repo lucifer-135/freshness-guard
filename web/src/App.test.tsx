@@ -1,8 +1,11 @@
 import { render, screen } from '@testing-library/react'
-import { expect, it } from 'vitest'
+import { beforeEach, expect, it } from 'vitest'
 import App from './App'
+import { clearToken } from '@/api/client'
 
-it('shows the product name as the page heading', () => {
+beforeEach(() => clearToken())
+
+it('asks for the plugin API token first', () => {
   render(<App />)
-  expect(screen.getByRole('heading', { level: 1, name: 'Freshness Guard' })).toBeInTheDocument()
+  expect(screen.getByRole('heading', { level: 1, name: 'Connect to Freshness Guard' })).toBeInTheDocument()
 })

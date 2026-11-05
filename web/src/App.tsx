@@ -1,7 +1,37 @@
-export default function App() {
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { useState } from 'react'
+import { createBrowserRouter, RouterProvider, type DataRouter } from 'react-router'
+import { ApiError } from '@/api/client'
+import { routes } from '@/app/routes'
+import { TokenGate } from '@/auth/TokenGate'
+import { EventStreamProvider } from '@/live/EventStream'
+
+function newQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        // A rejected token signs the user out; retrying would only repeat the 401.
+        retry: (failures, error) => !(error instanceof ApiError && error.status === 401) && failures < 2,
+      },
+    },
+  })
+}
+
+export function AppProviders({ router }: { router: DataRouter }) {
+  const [queryClient] = useState(newQueryClient)
   return (
-    <main className="min-h-dvh bg-bg p-8 text-text">
-      <h1 className="text-2xl font-semibold">Freshness Guard</h1>
-    </main>
+    <QueryClientProvider client={queryClient}>
+      <TokenGate>
+        <EventStreamProvider>
+          <RouterProvider router={router} />
+        </EventStreamProvider>
+      </TokenGate>
+    </QueryClientProvider>
   )
+}
+
+const router = createBrowserRouter(routes, { basename: import.meta.env.BASE_URL })
+
+export default function App() {
+  return <AppProviders router={router} />
 }
