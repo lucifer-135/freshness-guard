@@ -82,7 +82,7 @@ function AnswerView({ message, syncTimeoutMs, openClaimId, onOpenChange, onStatu
               : 'The answer was blocked because it contains outdated or incorrect claims.'}
           </Note>
           {message.reportId && (
-            <Link to={`/reports/${message.reportId}`} className="text-primary underline underline-offset-4">
+            <Link to={`/reports/${message.reportId}`} className="text-link underline underline-offset-4 hover:text-link-strong">
               Open the full report
             </Link>
           )}

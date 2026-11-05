@@ -34,7 +34,7 @@ export function ReportsPage() {
               {reports.data.map((r) => (
                 <tr key={r.id} className="border-t border-border hover:bg-surface-2">
                   <td className="px-3 py-2">
-                    <Link to={`/reports/${r.id}`} className="text-primary underline underline-offset-4">
+                    <Link to={`/reports/${r.id}`} className="text-link underline underline-offset-4 hover:text-link-strong">
                       {formatDateTime(r.created_at) || r.id}
                     </Link>
                   </td>

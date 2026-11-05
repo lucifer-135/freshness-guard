@@ -85,7 +85,7 @@ export function ExplainCard({ claim, report }: { claim: Claim; report: Report })
                   <li key={e.ref || i} className="rounded-md border border-border bg-surface-2 p-2">
                     <p className="font-medium [overflow-wrap:anywhere]">
                       {href ? (
-                        <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-4">
+                        <a href={href} target="_blank" rel="noopener noreferrer" className="text-link underline underline-offset-4 hover:text-link-strong">
                           {e.title || e.domain}
                         </a>
                       ) : (
@@ -125,7 +125,7 @@ export function ExplainCard({ claim, report }: { claim: Claim; report: Report })
         <p className="text-text-muted">Facts of this kind rarely change, so no decay curve is shown.</p>
       )}
 
-      <Link to={`/reports/${report.id}`} className="inline-block pt-2 text-primary underline underline-offset-4">
+      <Link to={`/reports/${report.id}`} className="inline-block pt-2 text-link underline underline-offset-4 hover:text-link-strong">
         Open full report
       </Link>
     </div>
