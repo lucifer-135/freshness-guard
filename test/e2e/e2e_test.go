@@ -389,9 +389,51 @@ func TestCachePurgeRemovesOutdatedAnswer(t *testing.T) {
 		readBody(t, again)
 		require.Equal(t, http.StatusOK, again.StatusCode)
 		if again.Header.Get("X-Bifrost-Cache-Hit") != "true" {
-			return
+			break
 		}
 		require.True(t, time.Now().Before(deadline), "the outdated answer was still served from the cache after 10 seconds")
 		time.Sleep(500 * time.Millisecond)
 	}
+
+	resp := pluginRequest(t, http.MethodGet, "/freshness/summary", "", true)
+	summaryBody := readBody(t, resp)
+	require.Equal(t, http.StatusOK, resp.StatusCode, summaryBody)
+	var summary struct {
+		CachePurges       int  `json:"cache_purges"`
+		CachePurgeEnabled bool `json:"cache_purge_enabled"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(summaryBody), &summary))
+	assert.True(t, summary.CachePurgeEnabled)
+	assert.GreaterOrEqual(t, summary.CachePurges, 1, "the dashboard counts the removed entry")
+}
+
+func TestLeaderboardCountsCheckedAnswers(t *testing.T) {
+	resp := postChat(t, `{"model":"openai/fake-model","messages":[{"role":"user","content":"What does Example Cloud Pro cost? (leaderboard)"}]}`, nil)
+	id := resp.Header.Get("X-Freshness-Report-Id")
+	readBody(t, resp)
+	require.NotEmpty(t, id)
+	assertAnswerReport(t, getReport(t, id))
+
+	resp = pluginRequest(t, http.MethodGet, "/freshness/leaderboard", "", true)
+	body := readBody(t, resp)
+	require.Equal(t, http.StatusOK, resp.StatusCode, body)
+	var lb struct {
+		Rows []struct {
+			Model string `json:"model"`
+			Cells map[string]struct {
+				Checked  int `json:"checked"`
+				Outdated int `json:"outdated"`
+			} `json:"cells"`
+		} `json:"rows"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(body), &lb))
+	var found bool
+	for _, row := range lb.Rows {
+		if row.Model == "openai/fake-model" {
+			found = true
+			assert.GreaterOrEqual(t, row.Cells["pricing"].Outdated, 1)
+			assert.GreaterOrEqual(t, row.Cells["version"].Checked, 1)
+		}
+	}
+	assert.True(t, found, "the fake model appears on the leaderboard: %s", body)
 }
