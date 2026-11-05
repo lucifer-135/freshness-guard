@@ -1,5 +1,5 @@
 import { ListChecks } from 'lucide-react'
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { ClaimInspector } from './ClaimInspector'
 import { Composer } from './Composer'
 import { MessageView } from './MessageView'
@@ -37,12 +37,21 @@ function Conversation() {
   const syncTimeoutMs = useStatus().data?.settings.sync_timeout_ms ?? 8000
   const [openClaim, setOpenClaim] = useState<string | null>(null)
   const [announcement, setAnnouncement] = useState('')
+  const [sheetOpen, setSheetOpen] = useState(false)
+  // A claim chosen in the sheet opens once the sheet has closed; opening it
+  // earlier would lose it when the sheet returns focus to its trigger.
+  const claimAfterSheet = useRef<string | null>(null)
   const onStatus = useCallback((sentence: string) => setAnnouncement(sentence), [])
 
   const latest = [...messages].reverse().find((m): m is AssistantMessage => m.role === 'assistant' && m.reportId !== null)
   const report = useReport(latest?.reportId ?? null, { enabled: latest?.phase === 'done' && latest.mode !== 'off' })
 
   function select(claimId: string) {
+    if (sheetOpen) {
+      claimAfterSheet.current = claimId
+      setSheetOpen(false)
+      return
+    }
     setOpenClaim(claimId)
     // Claim IDs repeat across reports (c1, c2, ...), so look only inside the latest answer.
     const scope = latest && document.querySelector(`[data-message-id="${CSS.escape(latest.id)}"]`)
@@ -74,14 +83,24 @@ function Conversation() {
         )}
         {inspector && (
           <div className="xl:hidden">
-            <Sheet>
+            <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
               <SheetTrigger asChild>
                 <Button variant="outline" size="sm">
                   <ListChecks aria-hidden="true" />
                   Claims
                 </Button>
               </SheetTrigger>
-              <SheetContent side="bottom" className="max-h-[70vh] overflow-y-auto p-4">
+              <SheetContent
+                side="bottom"
+                className="max-h-[70vh] overflow-y-auto p-4"
+                onCloseAutoFocus={(e) => {
+                  const claimId = claimAfterSheet.current
+                  if (!claimId) return
+                  e.preventDefault()
+                  claimAfterSheet.current = null
+                  select(claimId)
+                }}
+              >
                 <SheetHeader>
                   <SheetTitle>Claims in this answer</SheetTitle>
                 </SheetHeader>

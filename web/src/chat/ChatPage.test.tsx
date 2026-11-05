@@ -203,6 +203,17 @@ describe('ChatPage', () => {
     expect(articles[articles.length - 1]).toContainElement(scrolled[0] as HTMLElement)
   })
 
+  it('closes the claims sheet on narrow screens and opens the chosen claim', async () => {
+    fake = setup(streamedAnswer, completeReport())
+    await send()
+    await screen.findByText('2 claims checked. 1 claim is outdated.', {}, { timeout: 3000 })
+    await userEvent.click(screen.getByRole('button', { name: 'Claims' }))
+    const sheet = await screen.findByRole('dialog', { name: 'Claims in this answer' })
+    await userEvent.click(within(sheet).getAllByRole('button', { name: /Example Cloud Pro costs/ })[0])
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Claims in this answer' })).toBeNull())
+    expect(await screen.findByRole('dialog')).toHaveTextContent('Current value: $25 per month')
+  })
+
   it('lists claims by risk and opens a claim from the inspector', async () => {
     fake = setup(streamedAnswer, completeReport())
     await send()
