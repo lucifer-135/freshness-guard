@@ -104,7 +104,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		Token: cfg.APIToken, Reports: st, Jobs: eng, NewID: newID, Now: time.Now,
 		CheckTimeout: api.DefaultCheckTimeout, Logger: logger, Events: broker,
 		Gateway: gateway.New(cfg.BifrostBaseURL, cfg.BifrostVirtualKey, cfg.ChatCacheKey), Credits: budget,
-		UI: webui.Handler(webui.Static()),
+		UI: webui.Handler(webui.Static()), Stats: st, CachePurgeEnabled: cfg.CachePurgeEnabled,
 		Settings: api.Settings{
 			DefaultMode: cfg.DefaultMode, DefaultPolicy: cfg.DefaultPolicy,
 			SyncTimeoutMS: int(cfg.SyncTimeout / time.Millisecond),

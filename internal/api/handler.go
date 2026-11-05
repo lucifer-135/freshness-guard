@@ -51,6 +51,10 @@ type Deps struct {
 	// UI serves the web app under /freshness/ui/; nil means no web app.
 	UI       http.Handler
 	Settings Settings
+	// Stats feeds the dashboard routes. CachePurgeEnabled tells the dashboard
+	// whether the semantic-cache purge is switched on.
+	Stats             Stats
+	CachePurgeEnabled bool
 }
 
 type handler struct {
@@ -84,6 +88,10 @@ func NewHandler(deps Deps) http.Handler {
 	mux.Handle("POST /freshness/chat", protect(http.HandlerFunc(h.chat)))
 	mux.Handle("GET /freshness/models", protect(http.HandlerFunc(h.models)))
 	mux.Handle("GET /freshness/status", protect(http.HandlerFunc(h.status)))
+	if deps.Stats != nil {
+		mux.Handle("GET /freshness/leaderboard", protect(http.HandlerFunc(h.leaderboard)))
+		mux.Handle("GET /freshness/summary", protect(http.HandlerFunc(h.summary)))
+	}
 	if deps.UI != nil {
 		// The web app's files hold no secrets; it asks for the token itself.
 		mux.Handle("GET /freshness/ui/", deps.UI)
