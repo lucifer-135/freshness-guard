@@ -74,7 +74,23 @@ services:
     depends_on: [bifrost-e2e]
     profiles: ["tools"]
 
+  # Browser smoke tests of the web app against bifrost-e2e. The image tag must
+  # equal the @playwright/test version in web/package.json.
+  webtest:
+    image: mcr.microsoft.com/playwright:v1.64.1-noble
+    working_dir: /web
+    volumes:
+      - ../web:/web
+      - webnodemodules:/web/node_modules
+    environment:
+      FG_URL: http://bifrost-e2e:8091
+      FG_TOKEN: e2e-token
+    command: ["sh", "-c", "npm ci && npx playwright test"]
+    depends_on: [bifrost-e2e]
+    profiles: ["tools"]
+
 volumes:
+  webnodemodules:
   gomodcache:
   gobuildcache:
   bifrost-data:

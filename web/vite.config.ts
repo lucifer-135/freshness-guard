@@ -1,7 +1,7 @@
 import path from 'node:path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 
 export default defineConfig({
   base: '/freshness/ui/',
@@ -13,5 +13,6 @@ export default defineConfig({
       '^/freshness/(?!ui)': { target: process.env.FG_API_URL ?? 'http://localhost:8090' },
     },
   },
-  test: { environment: 'jsdom', setupFiles: './src/test/setup.ts', css: false },
+  // Playwright runs e2e/ in Docker; Vitest runs only the unit tests.
+  test: { environment: 'jsdom', setupFiles: './src/test/setup.ts', css: false, exclude: [...configDefaults.exclude, 'e2e/**'] },
 })
