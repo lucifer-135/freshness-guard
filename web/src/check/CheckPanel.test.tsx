@@ -72,6 +72,19 @@ describe('CheckPanel', () => {
     expect((await screen.findAllByText('Checking claims against live sources. 0 of 2 claims checked.')).length).toBeGreaterThan(0)
   })
 
+  it('keeps claims that events delivered while the check request was waiting', async () => {
+    let respond: (r: Response) => void = () => {}
+    let queryClient: QueryClient
+    ;({ fake, queryClient } = setup(() => new Promise<Response>((resolve) => (respond = resolve))))
+    fireEvent.change(field(), { target: { value: answer } })
+    await userEvent.click(button())
+    expect(screen.getByText('Checking the text.')).toBeInTheDocument()
+    const live = completeReport({ status: 'pending', claims: [staleClaim({ verdict: 'NOT_CHECKED' }), freshClaim({ verdict: 'NOT_CHECKED' })] })
+    act(() => queryClient.setQueryData(reportKey('r1'), live))
+    await act(async () => respond(json(202, { id: 'r1', status: 'pending' })))
+    expect((await screen.findAllByText('Checking claims against live sources. 0 of 2 claims checked.')).length).toBeGreaterThan(0)
+  })
+
   it('shows an API error and allows another try', async () => {
     ;({ fake } = setup(() => json(503, { error: 'The verification queue is full. Try again later.' })))
     fireEvent.change(field(), { target: { value: answer } })

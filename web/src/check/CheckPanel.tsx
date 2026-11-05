@@ -9,7 +9,8 @@ import { ScoreRing } from '@/claims/ScoreRing'
 import { useStaggeredClaims } from '@/claims/useStaggeredClaims'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { reportKey } from '@/live/reportCache'
+import type { Report } from '@/api/types'
+import { mergeReport, reportKey } from '@/live/reportCache'
 import { useReport } from '@/live/useReport'
 import { MagneticButton } from '@/motion/MagneticButton'
 
@@ -42,7 +43,8 @@ export function CheckPanel() {
     setError(null)
     try {
       const checked = await checkText(text)
-      queryClient.setQueryData(reportKey(checked.id), checked)
+      // The request can wait up to 30 s; events may already have delivered claims for it.
+      queryClient.setQueryData<Report>(reportKey(checked.id), (prev) => mergeReport(prev, checked))
       setOpenClaim(null)
       setReportId(checked.id)
     } catch (err) {
@@ -75,6 +77,7 @@ export function CheckPanel() {
               ? 'The text must not be longer than 20,000 characters.'
               : `${length.toLocaleString('en-GB')} of ${MAX_CHARACTERS.toLocaleString('en-GB')} characters`}
           </p>
+          {busy && !data && <p className="text-sm text-text-muted">Checking the text.</p>}
           {error && (
             <p role="alert" className="text-sm text-status-outdated">
               {error}
