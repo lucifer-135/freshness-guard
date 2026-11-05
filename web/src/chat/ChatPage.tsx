@@ -4,6 +4,7 @@ import { ClaimInspector } from './ClaimInspector'
 import { Composer } from './Composer'
 import { MessageView } from './MessageView'
 import { useChat, type AssistantMessage } from './useChat'
+import { CheckPanel } from '@/check/CheckPanel'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -23,7 +24,7 @@ export function ChatPage() {
           <Conversation />
         </TabsContent>
         <TabsContent value="check">
-          <p className="text-text-muted">Paste any answer here to check it.</p>
+          <CheckPanel />
         </TabsContent>
       </Tabs>
     </section>
