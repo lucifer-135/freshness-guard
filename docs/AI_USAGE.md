@@ -20,7 +20,7 @@ Safeguards:
 - A diff guard on rewrites. A rewritten answer is accepted only when at most 10 percent of the characters outside the outdated claims changed. Otherwise the plugin falls back to inline annotations (`internal/heal/guard.go`).
 - The plugin does not check its own calls. Its model calls carry `x-bf-freshness: off` and a unique cache key, and they are not stored in the semantic cache (`internal/llm/client.go`).
 - Failures do not break the gateway. Every hook recovers from panics and returns the response unchanged on an error, with `X-Freshness-Status: error`.
-- The accuracy numbers in the README come from `bench/results/` and describe one small, hand-labelled set. They are not a general accuracy claim.
+- The accuracy numbers in the README come from `bench/results/` and describe one small set whose labels Claude Code proposed from official sources and the developer has not yet reviewed (see section 2). They are not a general accuracy claim.
 
 ## 2. AI used to build the project
 

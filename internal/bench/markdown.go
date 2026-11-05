@@ -32,7 +32,7 @@ func CuratedMarkdown(meta RunMeta, s Summary, outcomes []Outcome) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Curated benchmark: %s\n\n", meta.Name)
 	b.WriteString("The target for precision is 0.8 (specification section 15.1). A target is not a result: the numbers below are what this run measured. ")
-	b.WriteString("Each item's label was checked by hand against the source named in the dataset on the date named there.\n\n")
+	b.WriteString("Each item's label was set from the source named in the dataset on the date named there. Who checked the labels is described in bench/README.md.\n\n")
 	if meta.Dataset != "" {
 		fmt.Fprintf(&b, "- Dataset: `%s`\n", meta.Dataset)
 	}

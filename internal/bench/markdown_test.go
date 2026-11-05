@@ -41,3 +41,10 @@ func TestCuratedMarkdownPrintsNotAvailableForMissingRates(t *testing.T) {
 	assert.Contains(t, md, "n/a (no outdated items)")
 	assert.NotContains(t, md, "NaN")
 }
+
+func TestCuratedMarkdownDoesNotClaimHumanChecking(t *testing.T) {
+	os := []Outcome{{ItemID: "a", Category: "pricing", Label: LabelOutdated, Predicted: PredictedOutdated}}
+	md := CuratedMarkdown(RunMeta{Name: "curated"}, Summarize(os), os)
+	assert.NotContains(t, md, "by hand")
+	assert.Contains(t, md, "bench/README.md", "the report points to the page that says who checked the labels")
+}

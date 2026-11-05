@@ -1,4 +1,4 @@
-// Package bench scores the freshness detector on a hand-labelled set of
+// Package bench scores the freshness detector on a labelled set of
 // claims and measures what async mode adds to a request.
 package bench
 
@@ -21,7 +21,7 @@ const (
 	LabelCurrent  Label = "current"
 )
 
-// Item is one claim of the curated set with its hand-checked label.
+// Item is one claim of the curated set with its label.
 type Item struct {
 	ID            string          `json:"id"`
 	Category      report.Category `json:"category"`

@@ -165,7 +165,7 @@ The plugin entry must use `"placement": "pre_builtin"`, so that its hooks also s
 
 All numbers below come from files in `bench/results/`. The set and the way its labels were made are described in [bench/README.md](bench/README.md). Targets are written as targets. They are not results.
 
-Curated set. 51 hand-labelled claims (27 outdated, 24 current), checked on 6 November 2026 against official sources. A text counts as predicted outdated when one of its checked claims is `STALE` or `WRONG`. The run (`curated-2026-11-05-2`) used `groq/openai/gpt-oss-20b` to extract and `groq/openai/gpt-oss-120b` to judge, on a fresh stack with no cached verdicts.
+Curated set. 51 claims (27 outdated, 24 current), labelled on 6 November 2026 from official sources. Claude Code proposed the labels and the developer has not yet reviewed them. A text counts as predicted outdated when one of its checked claims is `STALE` or `WRONG`. The run (`curated-2026-11-05-2`) used `groq/openai/gpt-oss-20b` to extract and `groq/openai/gpt-oss-120b` to judge, on a fresh stack with no cached verdicts.
 
 | Measure | Value |
 |---|---|

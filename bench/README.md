@@ -1,6 +1,6 @@
 # Curated benchmark set
 
-`curated.json` holds 51 hand-labelled claims. Freshness Guard checks each one, and `freshbench` compares the verdict with the label. The set measures how often the detector flags an outdated claim and how often it wrongly flags a current one. It is small, so the numbers it produces are an indication, not a proof.
+`curated.json` holds 51 labelled claims. Freshness Guard checks each one, and `freshbench` compares the verdict with the label. The set measures how often the detector flags an outdated claim and how often it wrongly flags a current one. It is small, so the numbers it produces are an indication, not a proof.
 
 ## Format
 
@@ -36,10 +36,10 @@ The benchmark runs on its own stack with a fresh database, so cached verdicts an
 
 ```bash
 docker compose -f deploy/docker-compose.yml --profile bench up -d --build bifrost-bench
-docker compose -f deploy/docker-compose.yml --profile bench run --rm freshbench curated -dataset bench/curated.json -out bench/results -name curated
+docker compose -f deploy/docker-compose.yml --profile bench run --rm freshbench curated -dataset bench/curated.json -out bench/results -name curated -concurrency 2 -pace 30s
 ```
 
-`deploy/.env` must hold `FG_API_TOKEN` and the keys of the models the stack uses. A full run spends Tavily credits, so check the remaining budget first. A result is written to `bench/results/curated-DATE.json` and `.md` and is never overwritten; a second run on the same day gets `-2`.
+`deploy/.env` must hold `FG_API_TOKEN` and the keys of the models the stack uses. `-pace 30s` starts one check every 30 seconds. It is needed on Groq's free tier, which allows 8000 tokens per minute for the default models: without it, a run returns rate-limit errors for most items, as the first run in `bench/results/` (`curated-2026-11-05`) did. A run takes about 25 minutes. A full run spends Tavily credits, so check the remaining budget first. A result is written to `bench/results/curated-DATE.json` and `.md` and is never overwritten; a second run on the same day gets `-2`.
 
 ## Correcting a label and re-scoring
 
