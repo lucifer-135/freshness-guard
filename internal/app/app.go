@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/lucifer-135/freshness-guard/internal/api"
+	"github.com/lucifer-135/freshness-guard/internal/cachepurge"
 	"github.com/lucifer-135/freshness-guard/internal/config"
 	"github.com/lucifer-135/freshness-guard/internal/engine"
 	"github.com/lucifer-135/freshness-guard/internal/events"
@@ -88,11 +89,21 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		Logger:          logger,
 	}
 	eng := engine.New(pipeline, cfg.Workers, cfg.QueueSize, logger)
+	if cfg.CachePurgeEnabled {
+		if cfg.BifrostSetupToken == "" {
+			logger.Warn("cache_purge.setup_token is empty, so Bifrost refuses to remove cached answers while its dashboard authentication is off.")
+		}
+		eng.Finish = &cachepurge.Purger{
+			Store:   st,
+			Bifrost: &cachepurge.Client{BaseURL: cfg.BifrostBaseURL, SetupToken: cfg.BifrostSetupToken},
+			Events:  broker, Now: time.Now, Logger: logger,
+		}
+	}
 
 	handler := api.NewHandler(api.Deps{
 		Token: cfg.APIToken, Reports: st, Jobs: eng, NewID: newID, Now: time.Now,
 		CheckTimeout: api.DefaultCheckTimeout, Logger: logger, Events: broker,
-		Gateway: gateway.New(cfg.BifrostBaseURL, cfg.BifrostVirtualKey), Credits: budget,
+		Gateway: gateway.New(cfg.BifrostBaseURL, cfg.BifrostVirtualKey, cfg.ChatCacheKey), Credits: budget,
 		UI: webui.Handler(webui.Static()),
 		Settings: api.Settings{
 			DefaultMode: cfg.DefaultMode, DefaultPolicy: cfg.DefaultPolicy,

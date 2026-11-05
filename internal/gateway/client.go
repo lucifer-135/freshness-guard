@@ -27,15 +27,18 @@ type Model struct {
 type Client struct {
 	baseURL    string
 	virtualKey string
+	cacheKey   string
 	http       *http.Client
 }
 
 // New returns a client for the Bifrost instance at baseURL. A non-empty
-// virtualKey is sent in the x-bf-vk header.
-func New(baseURL, virtualKey string) *Client {
+// virtualKey is sent in the x-bf-vk header. A non-empty cacheKey is sent in
+// x-bf-cache-key on chat requests, which puts their answers in that semantic
+// cache partition; Bifrost does not cache requests without a key.
+func New(baseURL, virtualKey, cacheKey string) *Client {
 	// No client timeout: chat answers may stream for a long time; callers
 	// bound requests with their context.
-	return &Client{baseURL: strings.TrimRight(baseURL, "/"), virtualKey: virtualKey, http: &http.Client{}}
+	return &Client{baseURL: strings.TrimRight(baseURL, "/"), virtualKey: virtualKey, cacheKey: cacheKey, http: &http.Client{}}
 }
 
 // Chat posts body to /v1/chat/completions with the freshness mode and policy
@@ -49,6 +52,9 @@ func (c *Client) Chat(ctx context.Context, body []byte, mode, policy string) (*h
 	req.Header.Set("x-bf-freshness", mode)
 	if policy != "" {
 		req.Header.Set("x-bf-freshness-policy", policy)
+	}
+	if c.cacheKey != "" {
+		req.Header.Set("x-bf-cache-key", c.cacheKey)
 	}
 	if c.virtualKey != "" {
 		req.Header.Set("x-bf-vk", c.virtualKey)

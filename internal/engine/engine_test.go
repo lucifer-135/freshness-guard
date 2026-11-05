@@ -149,3 +149,61 @@ func TestRunnerPanicBecomesErrorReport(t *testing.T) {
 	assert.Equal(t, "An internal error stopped the verification.", r.Reason)
 	assert.False(t, e.IsQueued("r-1"))
 }
+
+type fakeFinisher struct {
+	started chan string
+	release chan struct{}
+	panicID string
+
+	mu       sync.Mutex
+	finished []string
+}
+
+func (f *fakeFinisher) Finish(_ context.Context, r report.Report) {
+	if f.started != nil {
+		f.started <- r.ID
+	}
+	if r.ID == f.panicID {
+		panic("boom")
+	}
+	if f.release != nil {
+		<-f.release
+	}
+	f.mu.Lock()
+	f.finished = append(f.finished, r.ID)
+	f.mu.Unlock()
+}
+
+func TestFinisherRunsAfterResultIsDelivered(t *testing.T) {
+	fin := &fakeFinisher{started: make(chan string, 1), release: make(chan struct{})}
+	e := engine.New(&fakeRunner{}, 1, 4, slog.Default())
+	e.Finish = fin
+	e.Start()
+	ch, ok := e.Submit(job("r-1"))
+	require.True(t, ok)
+
+	// The finisher is still blocked, yet the caller already has its report.
+	assert.Equal(t, "r-1", receive(t, ch).ID)
+	assert.Equal(t, "r-1", <-fin.started)
+	close(fin.release)
+	stop(t, e)
+
+	fin.mu.Lock()
+	defer fin.mu.Unlock()
+	assert.Equal(t, []string{"r-1"}, fin.finished)
+}
+
+func TestFinisherPanicDoesNotStopWorker(t *testing.T) {
+	fin := &fakeFinisher{panicID: "r-1"}
+	e := engine.New(&fakeRunner{}, 1, 4, slog.Default())
+	e.Finish = fin
+	e.Start()
+	defer stop(t, e)
+
+	first, ok := e.Submit(job("r-1"))
+	require.True(t, ok)
+	receive(t, first)
+	second, ok := e.Submit(job("r-2"))
+	require.True(t, ok)
+	assert.Equal(t, "r-2", receive(t, second).ID)
+}

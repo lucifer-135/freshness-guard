@@ -53,6 +53,14 @@ type Config struct {
 
 	DBPath string
 
+	// CachePurgeEnabled turns on removing outdated answers from Bifrost's
+	// semantic cache. BifrostSetupToken authorizes the removal while dashboard
+	// authentication is off. ChatCacheKey is the cache partition the web chat
+	// uses; empty means the chat is not cached.
+	CachePurgeEnabled bool
+	BifrostSetupToken string
+	ChatCacheKey      string
+
 	VirtualKeys map[string]VirtualKey
 }
 
@@ -79,6 +87,7 @@ func Default() Config {
 		QueueSize:         256,
 		DailyCreditBudget: 30,
 		DBPath:            "/app/data/freshness.db",
+		CachePurgeEnabled: true,
 	}
 }
 
@@ -238,6 +247,13 @@ func Parse(raw any) (Config, []string) {
 	p.intRange(obj, "workers", &cfg.Workers, 1, 64)
 	p.intRange(obj, "queue_size", &cfg.QueueSize, 1, 10000)
 	p.intRange(obj, "daily_credit_budget", &cfg.DailyCreditBudget, 0, 100000)
+
+	var purge object
+	if decode(p, obj, "", "cache_purge", &purge) {
+		decode(p, purge, "cache_purge.", "enabled", &cfg.CachePurgeEnabled)
+		p.str(purge, "cache_purge.", "setup_token", &cfg.BifrostSetupToken, false)
+	}
+	p.str(obj, "", "chat_cache_key", &cfg.ChatCacheKey, false)
 
 	p.parseCutoffs(obj, &cfg)
 	p.parseVirtualKeys(obj, &cfg)

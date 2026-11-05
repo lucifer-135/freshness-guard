@@ -296,3 +296,34 @@ func TestSaveReportKeepsCacheFields(t *testing.T) {
 	assert.Equal(t, "cache-1", list[0].CacheID)
 	assert.True(t, list[0].CacheHit)
 }
+
+func TestCacheLinksAndPurges(t *testing.T) {
+	s, _ := openStore(t)
+	now := time.Date(2026, 11, 5, 10, 0, 0, 0, time.UTC)
+	factID, err := s.UpsertFact(ctx, report.Fact{Key: "example|price", Entity: "Example", Attribute: "price", LastVerifiedAt: now})
+	require.NoError(t, err)
+
+	require.NoError(t, s.LinkCache(ctx, "c1", "r1", []store.CacheLink{{FactID: factID, ValueKey: "25 per month"}}, now))
+	require.NoError(t, s.LinkCache(ctx, "c2", "r2", []store.CacheLink{{FactID: factID, ValueKey: "20 per month"}}, now))
+	// Linking the same entry again keeps one row.
+	require.NoError(t, s.LinkCache(ctx, "c1", "r3", []store.CacheLink{{FactID: factID, ValueKey: "25 per month"}}, now))
+
+	ids, err := s.CacheEntriesForFact(ctx, factID, "25 per month")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"c2"}, ids)
+	all, err := s.CacheEntriesForFact(ctx, factID, "no such value")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"c1", "c2"}, all)
+
+	require.NoError(t, s.RecordPurge(ctx, store.CachePurge{CacheID: "c2", ReportID: "r3", FactID: &factID, Reason: "fact_changed", At: now}))
+	ids, err = s.CacheEntriesForFact(ctx, factID, "25 per month")
+	require.NoError(t, err)
+	assert.Empty(t, ids)
+
+	n, err := s.CountPurges(ctx, now.Add(-time.Hour))
+	require.NoError(t, err)
+	assert.Equal(t, 1, n)
+	n, err = s.CountPurges(ctx, now.Add(time.Hour))
+	require.NoError(t, err)
+	assert.Equal(t, 0, n)
+}

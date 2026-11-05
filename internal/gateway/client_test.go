@@ -23,7 +23,7 @@ func TestChatSendsFreshnessHeaders(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	resp, err := gateway.New(srv.URL, "vk").Chat(context.Background(), []byte(`{"model":"m"}`), "sync", "heal")
+	resp, err := gateway.New(srv.URL, "vk", "").Chat(context.Background(), []byte(`{"model":"m"}`), "sync", "heal")
 	require.NoError(t, err)
 	defer resp.Body.Close()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -39,7 +39,7 @@ func TestChatOmitsEmptyPolicyAndKey(t *testing.T) {
 	var got http.Header
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { got = r.Header.Clone() }))
 	defer srv.Close()
-	resp, err := gateway.New(srv.URL, "").Chat(context.Background(), []byte(`{}`), "async", "")
+	resp, err := gateway.New(srv.URL, "", "").Chat(context.Background(), []byte(`{}`), "async", "")
 	require.NoError(t, err)
 	resp.Body.Close()
 	assert.Empty(t, got.Get("x-bf-freshness-policy"))
@@ -53,7 +53,7 @@ func TestModelsParsesAndSorts(t *testing.T) {
 		_, _ = w.Write([]byte(`{"data":[{"id":"groq/b"},{"id":"gemini/a"},{"id":"plain"}]}`))
 	}))
 	defer srv.Close()
-	models, err := gateway.New(srv.URL, "").Models(context.Background())
+	models, err := gateway.New(srv.URL, "", "").Models(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, []gateway.Model{{ID: "gemini/a", Provider: "gemini"}, {ID: "groq/b", Provider: "groq"}, {ID: "plain", Provider: ""}}, models)
 }
@@ -61,6 +61,22 @@ func TestModelsParsesAndSorts(t *testing.T) {
 func TestModelsReportsHTTPErrors(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(500) }))
 	defer srv.Close()
-	_, err := gateway.New(srv.URL, "").Models(context.Background())
+	_, err := gateway.New(srv.URL, "", "").Models(context.Background())
 	assert.Error(t, err)
+}
+
+func TestChatSendsCacheKey(t *testing.T) {
+	var got http.Header
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { got = r.Header.Clone() }))
+	defer srv.Close()
+
+	resp, err := gateway.New(srv.URL, "", "web-chat").Chat(context.Background(), []byte(`{}`), "async", "")
+	require.NoError(t, err)
+	resp.Body.Close()
+	assert.Equal(t, "web-chat", got.Get("x-bf-cache-key"))
+
+	resp, err = gateway.New(srv.URL, "", "").Chat(context.Background(), []byte(`{}`), "async", "")
+	require.NoError(t, err)
+	resp.Body.Close()
+	assert.Empty(t, got.Get("x-bf-cache-key"))
 }

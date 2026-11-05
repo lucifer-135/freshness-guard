@@ -18,6 +18,15 @@ type Runner interface {
 	Run(ctx context.Context, job Job) report.Report
 }
 
+// Finisher runs after a report has been delivered to the caller, so that slow
+// follow-up work never delays an answer. *cachepurge.Purger implements it.
+type Finisher interface {
+	Finish(ctx context.Context, r report.Report)
+}
+
+// FinishTimeout bounds one Finish call.
+const FinishTimeout = 15 * time.Second
+
 type queuedJob struct {
 	job    Job
 	result chan report.Report
@@ -26,6 +35,9 @@ type queuedJob struct {
 // Engine runs jobs in a fixed number of workers fed by a bounded queue.
 // Submitting never blocks.
 type Engine struct {
+	// Finish, when set before Start, runs after each report is delivered.
+	Finish Finisher
+
 	runner  Runner
 	workers int
 	logger  *slog.Logger
@@ -119,7 +131,24 @@ func (e *Engine) work() {
 		e.mu.Unlock()
 		q.result <- r
 		close(q.result)
+		e.finish(r)
 	}
+}
+
+// finish runs the finisher for a delivered report. A panic is logged and does
+// not stop the worker.
+func (e *Engine) finish(r report.Report) {
+	if e.Finish == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(e.base, FinishTimeout)
+	defer cancel()
+	defer func() {
+		if p := recover(); p != nil {
+			e.logger.Error("The cache purge after a report panicked.", "report", r.ID, "panic", p, "stack", string(debug.Stack()))
+		}
+	}()
+	e.Finish.Finish(ctx, r)
 }
 
 func (e *Engine) run(job Job) (r report.Report) {

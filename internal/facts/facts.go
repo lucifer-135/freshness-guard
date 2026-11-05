@@ -29,6 +29,10 @@ func NormalizeKey(entity, attribute string) string {
 	return normalize(entity) + "|" + normalize(attribute)
 }
 
+// NormalizeValue returns a fact value in the form NormalizeKey gives each part,
+// so two spellings of one value compare equal.
+func NormalizeValue(s string) string { return normalize(s) }
+
 func normalize(s string) string {
 	return strings.Join(strings.FieldsFunc(strings.ToLower(s), func(r rune) bool {
 		return !unicode.IsLetter(r) && !unicode.IsDigit(r)

@@ -239,3 +239,21 @@ func TestParseVirtualKeyPolicy(t *testing.T) {
 	assert.NotContains(t, cfg.VirtualKeys, "vk-b")
 	assert.Len(t, w, 1)
 }
+
+func TestParseCachePurge(t *testing.T) {
+	cfg, warnings := config.Parse(nil)
+	assert.Empty(t, warnings)
+	assert.True(t, cfg.CachePurgeEnabled)
+	assert.Empty(t, cfg.BifrostSetupToken)
+	assert.Empty(t, cfg.ChatCacheKey)
+
+	t.Setenv("FG_TEST_SETUP", "s3")
+	cfg, warnings = config.Parse(map[string]any{
+		"cache_purge":    map[string]any{"enabled": false, "setup_token": "env.FG_TEST_SETUP"},
+		"chat_cache_key": "web-chat",
+	})
+	assert.Empty(t, warnings)
+	assert.False(t, cfg.CachePurgeEnabled)
+	assert.Equal(t, "s3", cfg.BifrostSetupToken)
+	assert.Equal(t, "web-chat", cfg.ChatCacheKey)
+}

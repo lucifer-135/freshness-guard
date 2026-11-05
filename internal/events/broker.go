@@ -14,6 +14,8 @@ const (
 	TypeClaimVerdict   = "claim.verdict"
 	TypeReportComplete = "report.complete"
 	TypeReportError    = "report.error"
+	// TypeCachePurged says cached answers were removed from the semantic cache.
+	TypeCachePurged = "cache.purged"
 )
 
 // SubscriberBuffer is the number of events a subscriber can fall behind
