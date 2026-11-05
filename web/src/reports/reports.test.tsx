@@ -1,0 +1,80 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { render, screen } from '@testing-library/react'
+import { MemoryRouter, Route, Routes } from 'react-router'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { ReportPage } from './ReportPage'
+import { ReportsPage } from './ReportsPage'
+import { setToken } from '@/api/client'
+import { fakeFetch, json, type FakeFetch, type Route as FakeRoute } from '@/test/fakeFetch'
+import { answer, completeReport, freshClaim } from '@/test/fixtures'
+
+function renderAt(path: string, routes: Record<string, FakeRoute>) {
+  const fake = fakeFetch(routes)
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter basename="/freshness/ui" initialEntries={[`/freshness/ui${path}`]}>
+        <Routes>
+          <Route path="/reports" element={<ReportsPage />} />
+          <Route path="/reports/:id" element={<ReportPage />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+  return fake
+}
+
+describe('ReportsPage', () => {
+  let fake: FakeFetch
+  beforeEach(() => setToken('t1'))
+  afterEach(() => fake?.restore())
+
+  it('lists reports with links to each one', async () => {
+    fake = renderAt('/reports', {
+      'GET /freshness/reports': () => json(200, { reports: [completeReport(), completeReport({ id: 'r2', score: null })] }),
+    })
+    const links = await screen.findAllByRole('link')
+    expect(links.map((l) => l.getAttribute('href'))).toEqual(['/freshness/ui/reports/r1', '/freshness/ui/reports/r2'])
+    expect(screen.getByRole('columnheader', { name: 'Outdated' })).toBeInTheDocument()
+    expect(fake.requests[0].url.searchParams.get('limit')).toBe('50')
+  })
+
+  it('explains an empty list', async () => {
+    fake = renderAt('/reports', { 'GET /freshness/reports': () => json(200, { reports: null }) })
+    expect(
+      await screen.findByText('No answers have been checked yet. Send a message in the chat to see results here.'),
+    ).toBeInTheDocument()
+  })
+})
+
+describe('ReportPage', () => {
+  let fake: FakeFetch
+  beforeEach(() => setToken('t1'))
+  afterEach(() => fake?.restore())
+
+  it('shows the original and the corrected answer', async () => {
+    fake = renderAt('/reports/r1', { 'GET /freshness/reports/r1': () => json(200, completeReport()) })
+    expect(await screen.findByRole('heading', { name: 'Original answer' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Corrected answer' })).toBeInTheDocument()
+    expect(screen.getAllByText('$25 per month', { selector: 'ins' }).length).toBeGreaterThan(0)
+    expect(screen.getByText('Checked in 6.3 s')).toBeInTheDocument()
+    expect(screen.getByText('2 Tavily credits used')).toBeInTheDocument()
+    expect(screen.getByText('2 claims checked. 1 claim is outdated.')).toBeInTheDocument()
+  })
+
+  it('says when the answer was blocked', async () => {
+    fake = renderAt('/reports/r1', { 'GET /freshness/reports/r1': () => json(200, completeReport({ blocked: true })) })
+    expect(await screen.findByText('This answer was blocked before it reached the user.')).toBeInTheDocument()
+  })
+
+  it('says when nothing needed correction', async () => {
+    fake = renderAt('/reports/r1', {
+      'GET /freshness/reports/r1': () => json(200, completeReport({ claims: [freshClaim()], answer_text: answer })),
+    })
+    expect(await screen.findByText('No claims needed correction.')).toBeInTheDocument()
+  })
+
+  it('says when the report does not exist', async () => {
+    fake = renderAt('/reports/gone', { 'GET /freshness/reports/gone': () => json(404, { error: 'The report was not found.' }) })
+    expect(await screen.findByText('The report was not found.')).toBeInTheDocument()
+  })
+})

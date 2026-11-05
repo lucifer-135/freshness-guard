@@ -11,7 +11,11 @@ const NOT_FOUND_RETRY_MS = 2000
 // polls while the report is pending, in case events are missed. A report that
 // is not found yet is retried, because a streamed answer's report is stored
 // only after the stream ends.
-export function useReport(id: string | null, options: { enabled?: boolean } = {}): UseQueryResult<Report, ApiError> {
+export function useReport(
+  id: string | null,
+  options: { enabled?: boolean; notFoundRetries?: number } = {},
+): UseQueryResult<Report, ApiError> {
+  const notFoundRetries = options.notFoundRetries ?? NOT_FOUND_RETRIES
   const queryClient = useQueryClient()
   return useQuery<Report, ApiError>({
     queryKey: reportKey(id ?? ''),
@@ -21,7 +25,7 @@ export function useReport(id: string | null, options: { enabled?: boolean } = {}
     },
     enabled: id !== null && (options.enabled ?? true),
     refetchInterval: (query) => (query.state.data?.status === 'pending' ? POLL_MS : false),
-    retry: (failures, error) => error instanceof ApiError && error.status === 404 && failures < NOT_FOUND_RETRIES,
+    retry: (failures, error) => error instanceof ApiError && error.status === 404 && failures < notFoundRetries,
     retryDelay: NOT_FOUND_RETRY_MS,
   })
 }
