@@ -32,6 +32,7 @@ The plugin does not implement a stream-chunk hook. `PostLLMHook` runs once per c
 - Bifrost must be built as a dynamic binary, as described in its documentation for `make build DYNAMIC=1`. `deploy/Dockerfile` does this from source.
 - A Go plugin only loads when it is built with the same Go version and the same version of every shared module as the Bifrost binary. `deploy/check-shared-versions.sh` stops the Docker build when a shared module differs.
 - Go plugins load only on Linux and macOS, so the plugin is built and run in Docker.
+- The web app contains four React Bits components (`web/src/components/reactbits/`) under MIT + Commons Clause. They must be replaced with Apache-2.0 code before an upstream pull request.
 
 ## 4. Gaps found and proposed changes
 
@@ -57,7 +58,7 @@ Readiness checklist:
 
 - [x] Unit tests, end-to-end tests and web tests exist and pass locally (see the README for the last results).
 - [x] A continuous integration workflow exists (`.github/workflows/ci.yml`). It has not run yet because the repository has not been pushed with it.
-- [x] The code is under the Apache License 2.0, the licence of Bifrost (`LICENSE`, `NOTICE`).
+- [ ] The code is under the Apache License 2.0, the licence of Bifrost (`LICENSE`, `NOTICE`), except for four React Bits components in `web/src/components/reactbits/` (MIT + Commons Clause), which must be replaced first.
 - [x] No breaking change: the plugin adds behaviour only when it is configured, and each hook returns the response unchanged on any error.
 - [ ] The contribution guide of the Bifrost repository has been read and followed.
 - [ ] The maintainers have agreed to where the code lives.
