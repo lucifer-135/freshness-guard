@@ -84,6 +84,14 @@ func (h *handler) chat(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
+	// The web app reads a 401 as "the plugin token was rejected" and signs the
+	// user out, so a credential error from Bifrost or a provider becomes a 502.
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		h.Logger.Warn("Bifrost or the model provider rejected the chat request's credentials.", "status", resp.StatusCode)
+		writeError(w, http.StatusBadGateway, "Bifrost or the model provider rejected the request's credentials. Check the provider keys in Bifrost.")
+		return
+	}
+
 	for name, values := range resp.Header {
 		if name == "Content-Type" || name == "Cache-Control" || strings.HasPrefix(name, "X-Freshness-") {
 			w.Header()[name] = values

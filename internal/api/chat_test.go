@@ -131,6 +131,17 @@ func TestChatProxyGatewayDown(t *testing.T) {
 	assert.Equal(t, "Bifrost could not be reached.", errorOf(t, rec))
 }
 
+// A provider or virtual-key rejection must not look like a rejected plugin
+// token, or the web app would sign the user out.
+func TestChatProxyMapsUpstreamAuthErrors(t *testing.T) {
+	for _, status := range []int{http.StatusUnauthorized, http.StatusForbidden} {
+		g := &fakeGateway{resp: jsonResponse(status, nil, `{"error":{"message":"invalid api key"}}`)}
+		rec := do(chatHandler(g), http.MethodPost, "/freshness/chat", "t", chatBody)
+		assert.Equal(t, http.StatusBadGateway, rec.Code, status)
+		assert.Equal(t, "Bifrost or the model provider rejected the request's credentials. Check the provider keys in Bifrost.", errorOf(t, rec))
+	}
+}
+
 func TestModelsEndpoint(t *testing.T) {
 	g := &fakeGateway{models: []gateway.Model{{ID: "gemini/a", Provider: "gemini"}}}
 	rec := do(chatHandler(g), http.MethodGet, "/freshness/models", "t", "")
