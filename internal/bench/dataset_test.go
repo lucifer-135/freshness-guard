@@ -1,8 +1,10 @@
 package bench
 
 import (
+	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -58,4 +60,44 @@ func TestLoadItemsAllowsEmptyChangedOn(t *testing.T) {
 	j := "[" + strings.Replace(strings.Replace(validItem, "%s", "a", 1), `"changed_on":"2025-10-28"`, `"changed_on":""`, 1) + "]"
 	_, err := LoadItems(strings.NewReader(j))
 	require.NoError(t, err)
+}
+
+func TestCuratedDatasetIsValid(t *testing.T) {
+	f, err := os.Open("../../bench/curated.json")
+	require.NoError(t, err)
+	defer f.Close()
+	items, err := LoadItems(f)
+	require.NoError(t, err)
+
+	assert.GreaterOrEqual(t, len(items), 45)
+	assert.LessOrEqual(t, len(items), 60)
+
+	labels := map[Label]int{}
+	categories := map[string]int{}
+	texts := map[string]string{}
+	for _, it := range items {
+		labels[it.Label]++
+		categories[string(it.Category)]++
+		if other, dup := texts[it.Text]; dup {
+			t.Errorf("items %q and %q share the same text", other, it.ID)
+		}
+		texts[it.Text] = it.ID
+
+		checked, err := time.Parse(dateLayout, it.CheckedOn)
+		require.NoError(t, err, it.ID)
+		assert.False(t, checked.Before(time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)), "%s: checked_on is before 2026-11-01", it.ID)
+
+		if it.Label == LabelOutdated {
+			require.NotEmpty(t, it.ChangedOn, "%s: an outdated item needs changed_on", it.ID)
+			changed, err := time.Parse(dateLayout, it.ChangedOn)
+			require.NoError(t, err, it.ID)
+			assert.False(t, changed.Before(time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)), "%s: changed_on is before 2025-01-01", it.ID)
+			assert.False(t, changed.After(checked), "%s: changed_on is after checked_on", it.ID)
+		}
+	}
+	assert.GreaterOrEqual(t, labels[LabelOutdated], 20)
+	assert.GreaterOrEqual(t, labels[LabelCurrent], 20)
+	for _, c := range []string{"pricing", "version", "leadership"} {
+		assert.GreaterOrEqual(t, categories[c], 8, "category %s", c)
+	}
 }
