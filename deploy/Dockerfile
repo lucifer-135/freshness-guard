@@ -7,11 +7,25 @@
 # separately with the same toolchain, and a check stops the build when the two
 # would compile a shared module at different versions.
 #
-# The Bifrost source comes from the extra build context "bifrost-src": a sparse
-# checkout of tag transports/v2.4.0 (folders transports/ and ui/) made on the
-# host by deploy/fetch-bifrost.sh. Cloning inside the build was too slow and
-# failed on large transfers.
+# The Bifrost source comes from the build context "bifrost-src": a sparse
+# checkout of tag transports/v2.4.0 (folders transports/ and ui/). docker compose
+# passes the checkout made on the host by deploy/fetch-bifrost.sh, because
+# cloning inside the build was slow and failed on large transfers there. A build
+# without that context, such as the one Hugging Face Spaces runs, uses the
+# bifrost-clone stage below instead.
 ARG GO_IMAGE=golang:1.27.3-trixie
+
+# A "bifrost-src" build context replaces the stage of the same name, so local
+# builds do not clone.
+FROM ${GO_IMAGE} AS bifrost-clone
+ARG BIFROST_TAG=transports/v2.4.0
+RUN git -c core.autocrlf=false clone --depth 1 --filter=blob:none --sparse --branch "$BIFROST_TAG" \
+      https://github.com/maximhq/bifrost.git /src \
+ && git -C /src sparse-checkout set transports ui \
+ && rm -rf /src/.git
+
+FROM scratch AS bifrost-src
+COPY --from=bifrost-clone /src/ /
 
 FROM node:25-alpine AS ui
 WORKDIR /app
@@ -55,3 +69,14 @@ COPY --from=builder /out/freshness-guard.so /app/plugins/freshness-guard.so
 EXPOSE 8080 8090
 ENTRYPOINT ["/app/bifrost-http"]
 CMD ["-app-dir", "/app/data", "-host", "0.0.0.0", "-port", "8080", "-log-style", "pretty"]
+
+# The image for Hugging Face Spaces, which builds the last stage of a Dockerfile.
+# A Space publishes one port, so only the plugin API (8090, protected by the
+# judge token) listens on all interfaces; Bifrost keeps to loopback. Spaces run
+# the container as user 1000.
+FROM runtime AS hosted
+COPY deploy/hosted/config.json /app/data/config.json
+RUN chown -R 1000:1000 /app/data
+USER 1000
+EXPOSE 8090
+CMD ["-app-dir", "/app/data", "-host", "127.0.0.1", "-port", "8080", "-log-style", "pretty"]

@@ -1,0 +1,107 @@
+{
+  "client": {
+    "enforce_auth_on_inference": false
+  },
+  "providers": {
+    "groq": {
+      "keys": [
+        {
+          "name": "groq",
+          "value": "env.GROQ_API_KEY",
+          "models": [
+            "*"
+          ],
+          "weight": 1
+        }
+      ]
+    },
+    "gemini": {
+      "keys": [
+        {
+          "name": "gemini",
+          "value": "env.GEMINI_API_KEY",
+          "models": [
+            "*"
+          ],
+          "weight": 1
+        }
+      ]
+    }
+  },
+  "vector_store": {
+    "enabled": true,
+    "type": "chromem",
+    "config": {}
+  },
+  "mcp": {
+    "client_configs": [
+      {
+        "name": "freshness_guard",
+        "connection_type": "http",
+        "connection_string": "http://127.0.0.1:8090/freshness/mcp",
+        "auth_type": "headers",
+        "headers": {
+          "X-Freshness-Token": "env.FG_API_TOKEN"
+        },
+        "tools_to_execute": [
+          "*"
+        ],
+        "tools_to_auto_execute": [],
+        "allow_by_default": true
+      }
+    ],
+    "tool_manager_config": {
+      "disable_auto_tool_inject": true,
+      "tool_execution_timeout": "45s"
+    }
+  },
+  "plugins": [
+    {
+      "enabled": true,
+      "name": "semantic_cache",
+      "config": {
+        "provider": "gemini",
+        "embedding_model": "gemini-embedding-001",
+        "dimension": 3072,
+        "ttl": "1h",
+        "threshold": 0.8
+      }
+    },
+    {
+      "enabled": true,
+      "name": "freshness-guard",
+      "path": "/app/plugins/freshness-guard.so",
+      "placement": "pre_builtin",
+      "config": {
+        "api": {
+          "host": "0.0.0.0",
+          "port": 8090,
+          "token": "env.FG_API_TOKEN"
+        },
+        "tavily_api_key": "env.TAVILY_API_KEY",
+        "models": {
+          "extract": "groq/openai/gpt-oss-20b",
+          "judge": "groq/openai/gpt-oss-120b"
+        },
+        "fallbacks": {
+          "extract": [
+            "gemini/gemini-3.5-flash-lite"
+          ],
+          "judge": [
+            "gemini/gemini-3.5-flash"
+          ]
+        },
+        "model_cutoffs": {
+          "groq/openai/gpt-oss-20b": "2024-06",
+          "groq/openai/gpt-oss-120b": "2024-06"
+        },
+        "daily_credit_budget": 100,
+        "chat_cache_key": "web-chat",
+        "cache_purge": {
+          "setup_token": "env.BIFROST_SETUP_TOKEN"
+        },
+        "db_path": "/app/data/freshness.db"
+      }
+    }
+  ]
+}
