@@ -1,0 +1,32 @@
+{
+  "Meta": {
+    "name": "overhead",
+    "note": "Docker Desktop on Windows 11, fake provider, one request at a time",
+    "started_at": "2026-11-05T20:18:12.064265097Z",
+    "finished_at": "2026-11-05T20:18:13.468183049Z"
+  },
+  "Off": {
+    "Mode": "off",
+    "Requests": 500,
+    "P50US": 1015,
+    "P95US": 1694,
+    "P99US": 3778,
+    "MeanUS": 1146,
+    "Statuses": {
+      "": 500
+    }
+  },
+  "Async": {
+    "Mode": "async",
+    "Requests": 500,
+    "P50US": 1010,
+    "P95US": 1660,
+    "P99US": 3496,
+    "MeanUS": 1140,
+    "Statuses": {
+      "pending": 500
+    }
+  },
+  "AddedP50US": -5,
+  "AddedP99US": -282
+}
