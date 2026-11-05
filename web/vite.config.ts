@@ -6,6 +6,10 @@ import { configDefaults, defineConfig } from 'vitest/config'
 export default defineConfig({
   base: '/freshness/ui/',
   plugins: [react(), tailwindcss()],
+  build: {
+    // Written into dist/ and embedded in the plugin. No leading dot: go:embed skips dot files.
+    license: { fileName: 'third-party-licenses.md' },
+  },
   resolve: { alias: { '@': path.resolve(import.meta.dirname, 'src') } },
   server: {
     proxy: {
