@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { Outlet, useLocation } from 'react-router'
+import { ChatProvider } from '@/chat/ChatProvider'
 import { NavRail } from './NavRail'
 import { CursorAura } from '@/motion/CursorAura'
 import { SignalField } from '@/motion/SignalField'
@@ -33,7 +34,9 @@ export function AppShell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar />
         <main id="main" ref={main} tabIndex={-1} className="flex-1 p-4 outline-none lg:p-6">
-          <Outlet />
+          <ChatProvider>
+            <Outlet />
+          </ChatProvider>
         </main>
       </div>
     </div>

@@ -1,9 +1,12 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
+import type { ReactNode } from 'react'
+import { ChatProvider, useChat } from './ChatProvider'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { groupModels, splitModel } from './models'
-import { useChat } from './useChat'
 import { setToken } from '@/api/client'
 import { fakeFetch, json, type FakeFetch } from '@/test/fakeFetch'
+
+const wrapper = ({ children }: { children: ReactNode }) => <ChatProvider>{children}</ChatProvider>
 
 const options = { model: 'openai/fake-model', mode: 'sync' as const, policy: 'heal' as const }
 
@@ -15,7 +18,7 @@ describe('useChat', () => {
   it('sends the conversation so far with each message', async () => {
     let n = 0
     fake = fakeFetch({ 'POST /freshness/chat': () => json(200, { choices: [{ message: { content: `answer ${++n}` } }] }) })
-    const { result } = renderHook(() => useChat())
+    const { result } = renderHook(() => useChat(), { wrapper })
     act(() => result.current.send('first', options))
     await waitFor(() => expect(result.current.busy).toBe(false))
     act(() => result.current.send('second', options))
@@ -28,12 +31,12 @@ describe('useChat', () => {
     ])
   })
 
-  it('stops the request when the page closes', async () => {
+  it('stops the request when the app closes', async () => {
     fake = fakeFetch({
       'POST /freshness/chat': () =>
         new Response(new ReadableStream({ start() {} }), { headers: { 'Content-Type': 'text/event-stream' } }),
     })
-    const { result, unmount } = renderHook(() => useChat())
+    const { result, unmount } = renderHook(() => useChat(), { wrapper })
     act(() => result.current.send('hello', { ...options, mode: 'async' }))
     await waitFor(() => expect(fake.requests).toHaveLength(1))
     unmount()

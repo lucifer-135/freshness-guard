@@ -34,9 +34,17 @@ function history(messages: Message[]): ChatTurn[] {
   })
 }
 
-// useChat holds one conversation in memory and sends each message, with the
-// conversation so far, through the plugin's chat proxy.
-export function useChat() {
+export interface ChatSession {
+  messages: Message[]
+  busy: boolean
+  send(text: string, options: { model: string; mode: Mode; policy: Policy | null }): void
+}
+
+// useChatState holds one conversation in memory and sends each message, with
+// the conversation so far, through the plugin's chat proxy. ChatProvider owns
+// it above the routes, so the conversation and a running request survive tab
+// switches and page changes; the request stops only when the app closes.
+export function useChatState(): ChatSession {
   const [messages, setMessages] = useState<Message[]>([])
   const [busy, setBusy] = useState(false)
   const latest = useRef<Message[]>([])

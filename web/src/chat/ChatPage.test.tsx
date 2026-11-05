@@ -157,6 +157,19 @@ describe('ChatPage', () => {
     expect(fake.requests.some((r) => r.path.startsWith('/freshness/reports/'))).toBe(false)
   })
 
+  it('keeps the conversation across tabs and pages', async () => {
+    fake = setup(streamedAnswer, completeReport())
+    await send()
+    await screen.findByText('2 claims checked. 1 claim is outdated.', {}, { timeout: 3000 })
+    await userEvent.click(screen.getByRole('tab', { name: 'Check any answer' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Chat' }))
+    expect(screen.getByText('What does it cost?')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('link', { name: 'Reports' }))
+    await userEvent.click(screen.getByRole('link', { name: 'Chat' }))
+    expect(await screen.findByText('What does it cost?')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Example Cloud Pro costs $20 per month' })).toBeInTheDocument()
+  })
+
   it('lists claims by risk and opens a claim from the inspector', async () => {
     fake = setup(streamedAnswer, completeReport())
     await send()
