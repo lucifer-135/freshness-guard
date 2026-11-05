@@ -44,7 +44,9 @@ function Conversation() {
 
   function select(claimId: string) {
     setOpenClaim(claimId)
-    document.querySelector(`[data-claim-id="${CSS.escape(claimId)}"]`)?.scrollIntoView?.({ block: 'center' })
+    // Claim IDs repeat across reports (c1, c2, ...), so look only inside the latest answer.
+    const scope = latest && document.querySelector(`[data-message-id="${CSS.escape(latest.id)}"]`)
+    scope?.querySelector(`[data-claim-id="${CSS.escape(claimId)}"]`)?.scrollIntoView?.({ block: 'center' })
   }
 
   const inspector = report.data && <ClaimInspector report={report.data} onSelect={select} />
@@ -59,14 +61,15 @@ function Conversation() {
           <p className="text-text-muted">Ask a question to see which parts of the answer are still current.</p>
         ) : (
           messages.map((m) => (
-            <MessageView
-              key={m.id}
-              message={m}
-              syncTimeoutMs={syncTimeoutMs}
-              openClaimId={m === latest ? openClaim : undefined}
-              onOpenChange={m === latest ? setOpenClaim : undefined}
-              onStatus={m === latest ? onStatus : undefined}
-            />
+            <div key={m.id} data-message-id={m.id}>
+              <MessageView
+                message={m}
+                syncTimeoutMs={syncTimeoutMs}
+                openClaimId={m === latest ? openClaim : undefined}
+                onOpenChange={m === latest ? setOpenClaim : undefined}
+                onStatus={m === latest ? onStatus : undefined}
+              />
+            </div>
           ))
         )}
         {inspector && (

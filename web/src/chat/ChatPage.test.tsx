@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -168,6 +168,39 @@ describe('ChatPage', () => {
     await userEvent.click(screen.getByRole('link', { name: 'Chat' }))
     expect(await screen.findByText('What does it cost?')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Example Cloud Pro costs $20 per month' })).toBeInTheDocument()
+  })
+
+  it('scrolls to the claim in the latest answer, not an earlier one with the same claim ID', async () => {
+    let n = 0
+    const twoAnswers: Route = () => {
+      n++
+      return new Response(streamBody([chunk(answer), 'data: [DONE]\n\n']), {
+        headers: { 'Content-Type': 'text/event-stream', 'X-Freshness-Report-Id': `r${n}`, 'X-Freshness-Status': 'pending' },
+      })
+    }
+    fake = setup(twoAnswers, completeReport())
+    fake.restore()
+    fake = fakeFetch({
+      'GET /freshness/status': () => status.clone(),
+      'GET /freshness/models': () => json(200, { models: [{ id: 'openai/fake-model', provider: 'openai' }] }),
+      'GET /freshness/events': () => new Response(new ReadableStream({ start() {} }), { headers: { 'Content-Type': 'text/event-stream' } }),
+      'POST /freshness/chat': twoAnswers,
+      'GET /freshness/reports/r1': () => json(200, completeReport({ id: 'r1' })),
+      'GET /freshness/reports/r2': () => json(200, completeReport({ id: 'r2' })),
+    })
+    const scrolled: Element[] = []
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolled.push(this)
+    }
+    await send('first')
+    await screen.findAllByText('2 claims checked. 1 claim is outdated.', {}, { timeout: 3000 })
+    await send('second')
+    await waitFor(() => expect(screen.getAllByText('2 claims checked. 1 claim is outdated.')).toHaveLength(2), { timeout: 3000 })
+    const inspector = screen.getByRole('complementary', { name: 'Claims in this answer' })
+    await userEvent.click(within(inspector).getAllByRole('button')[0])
+    const articles = screen.getAllByRole('article')
+    expect(scrolled).toHaveLength(1)
+    expect(articles[articles.length - 1]).toContainElement(scrolled[0] as HTMLElement)
   })
 
   it('lists claims by risk and opens a claim from the inspector', async () => {
