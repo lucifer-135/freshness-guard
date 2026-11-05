@@ -211,3 +211,50 @@ func TestBearerSchemeIsCaseInsensitive(t *testing.T) {
 		assert.Equal(t, http.StatusOK, rec.Code, auth)
 	}
 }
+
+const mcpInitialize = `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"test","version":"1"}}}`
+
+func doMCP(h http.Handler, headers map[string]string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodPost, "/freshness/mcp", strings.NewReader(mcpInitialize))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
+func TestMCPRouteNeedsToken(t *testing.T) {
+	rec := doMCP(newHandler("secret", &fakeReports{}, &fakeJobs{}), nil)
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
+func TestMCPRouteAcceptsFreshnessTokenHeader(t *testing.T) {
+	rec := doMCP(newHandler("secret", &fakeReports{}, &fakeJobs{}), map[string]string{"X-Freshness-Token": "secret"})
+	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+}
+
+func TestMCPRouteAcceptsBearerToken(t *testing.T) {
+	rec := doMCP(newHandler("secret", &fakeReports{}, &fakeJobs{}), map[string]string{"Authorization": "Bearer secret"})
+	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+}
+
+func TestMCPRouteRefusesWrongFreshnessToken(t *testing.T) {
+	rec := doMCP(newHandler("secret", &fakeReports{}, &fakeJobs{}), map[string]string{"X-Freshness-Token": "secrets"})
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
+func TestMCPRouteDisabledWithoutToken(t *testing.T) {
+	rec := doMCP(newHandler("", &fakeReports{}, &fakeJobs{}), map[string]string{"X-Freshness-Token": ""})
+	assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
+}
+
+func TestReportsIgnoreFreshnessTokenHeader(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/freshness/reports", nil)
+	req.Header.Set("X-Freshness-Token", "secret")
+	rec := httptest.NewRecorder()
+	newHandler("secret", &fakeReports{}, &fakeJobs{}).ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}

@@ -12,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/lucifer-135/freshness-guard/internal/engine"
+	"github.com/lucifer-135/freshness-guard/internal/mcp"
 	"github.com/lucifer-135/freshness-guard/internal/report"
 	"github.com/lucifer-135/freshness-guard/internal/store"
 )
@@ -92,6 +93,10 @@ func NewHandler(deps Deps) http.Handler {
 		mux.Handle("GET /freshness/leaderboard", protect(http.HandlerFunc(h.leaderboard)))
 		mux.Handle("GET /freshness/summary", protect(http.HandlerFunc(h.summary)))
 	}
+	// Every method: Streamable HTTP uses POST, GET and DELETE on one path.
+	mux.Handle(mcp.Path, requireMCPToken(deps.Token)(mcp.NewHandler(func(ctx context.Context, text string) (report.Report, bool, error) {
+		return h.checkText(ctx, text, "", "")
+	})))
 	if deps.UI != nil {
 		// The web app's files hold no secrets; it asks for the token itself.
 		mux.Handle("GET /freshness/ui/", deps.UI)
@@ -168,39 +173,62 @@ type checkRequest struct {
 	Model  string `json:"model"`
 }
 
+// checkError is a refused check: the HTTP status and the sentence shown to
+// the caller, through the API or the MCP tool.
+type checkError struct {
+	status  int
+	message string
+}
+
+func (e *checkError) Error() string { return e.message }
+
 func (h *handler) check(w http.ResponseWriter, r *http.Request) {
 	var req checkRequest
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes)).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "The request body must be a JSON object with a text field.")
 		return
 	}
-	if strings.TrimSpace(req.Text) == "" {
-		writeError(w, http.StatusBadRequest, "The text field must not be empty.")
-		return
+	rep, done, err := h.checkText(r.Context(), req.Text, req.Prompt, req.Model)
+	var refused *checkError
+	switch {
+	case errors.As(err, &refused):
+		writeError(w, refused.status, refused.message)
+	case err != nil:
+		// The client went away; there is nobody to answer.
+	case done:
+		writeJSON(w, http.StatusOK, rep)
+	default:
+		writeJSON(w, http.StatusAccepted, pendingReport{ID: rep.ID, Status: string(report.StatusPending)})
 	}
-	if utf8.RuneCountInString(req.Text) > MaxCheckTextRunes {
-		writeError(w, http.StatusBadRequest, "The text field must not be longer than 20000 characters.")
-		return
+}
+
+// checkText validates text, submits it and waits up to CheckTimeout. done is
+// false when the check is still running; the report then carries only its ID.
+func (h *handler) checkText(ctx context.Context, text, prompt, model string) (report.Report, bool, error) {
+	if strings.TrimSpace(text) == "" {
+		return report.Report{}, false, &checkError{http.StatusBadRequest, "The text field must not be empty."}
+	}
+	if utf8.RuneCountInString(text) > MaxCheckTextRunes {
+		return report.Report{}, false, &checkError{http.StatusBadRequest, "The text field must not be longer than 20000 characters."}
 	}
 
-	job := engine.Job{ReportID: h.NewID(), Answer: req.Text, Prompt: req.Prompt, Model: req.Model, Mode: "check", At: h.Now()}
+	job := engine.Job{ReportID: h.NewID(), Answer: text, Prompt: prompt, Model: model, Mode: "check", At: h.Now()}
 	result, ok := h.Jobs.Submit(job)
 	if !ok {
-		writeError(w, http.StatusServiceUnavailable, "The verification queue is full. Try again later.")
-		return
+		return report.Report{}, false, &checkError{http.StatusServiceUnavailable, "The verification queue is full. Try again later."}
 	}
 
+	pending := report.Report{ID: job.ReportID, Status: report.StatusPending}
 	timer := time.NewTimer(h.CheckTimeout)
 	defer timer.Stop()
 	select {
 	case rep, ok := <-result:
 		if ok {
-			writeJSON(w, http.StatusOK, rep)
-			return
+			return rep, true, nil
 		}
 	case <-timer.C:
-	case <-r.Context().Done():
-		return
+	case <-ctx.Done():
+		return pending, false, ctx.Err()
 	}
-	writeJSON(w, http.StatusAccepted, pendingReport{ID: job.ReportID, Status: string(report.StatusPending)})
+	return pending, false, nil
 }

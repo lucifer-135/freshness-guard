@@ -26,3 +26,22 @@ func requireToken(token string) func(http.Handler) http.Handler {
 		})
 	}
 }
+
+// requireMCPToken protects the MCP endpoint. Besides the bearer token it
+// accepts the token in X-Freshness-Token, because Bifrost's MCP client header
+// values resolve "env." only as a whole value, so "Bearer env.X" cannot be
+// written in config.json.
+func requireMCPToken(token string) func(http.Handler) http.Handler {
+	bearer := requireToken(token)
+	return func(next http.Handler) http.Handler {
+		fallback := bearer(next)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			given := strings.TrimSpace(r.Header.Get("X-Freshness-Token"))
+			if token != "" && given != "" && subtle.ConstantTimeCompare([]byte(given), []byte(token)) == 1 {
+				next.ServeHTTP(w, r)
+				return
+			}
+			fallback.ServeHTTP(w, r)
+		})
+	}
+}
