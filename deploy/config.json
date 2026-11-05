@@ -15,7 +15,19 @@
       "keys": [{ "name": "openrouter", "value": "env.OPENROUTER_API_KEY", "models": ["*"], "weight": 1.0 }]
     }
   },
+  "vector_store": { "enabled": true, "type": "chromem", "config": {} },
   "plugins": [
+    {
+      "enabled": true,
+      "name": "semantic_cache",
+      "config": {
+        "provider": "gemini",
+        "embedding_model": "gemini-embedding-001",
+        "dimension": 3072,
+        "ttl": "1h",
+        "threshold": 0.8
+      }
+    },
     {
       "enabled": true,
       "name": "freshness-guard",
@@ -28,6 +40,8 @@
         "fallbacks": { "extract": ["gemini/gemini-3.5-flash-lite"], "judge": ["gemini/gemini-3.5-flash"] },
         "model_cutoffs": { "groq/openai/gpt-oss-20b": "2024-06", "groq/openai/gpt-oss-120b": "2024-06" },
         "daily_credit_budget": 200,
+        "chat_cache_key": "web-chat",
+        "cache_purge": { "setup_token": "env.BIFROST_SETUP_TOKEN" },
         "db_path": "/app/data/freshness.db"
       }
     }
