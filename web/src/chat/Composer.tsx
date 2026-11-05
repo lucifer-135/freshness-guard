@@ -1,12 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { Send } from 'lucide-react'
 import { useId, useState, type FormEvent, type KeyboardEvent } from 'react'
-import { groupModels } from './models'
+import { ModelPicker } from './ModelPicker'
 import { getModels } from '@/api/client'
 import type { Mode, Policy } from '@/api/types'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { MagneticButton } from '@/motion/MagneticButton'
 import { useStatus } from '@/shell/TopBar'
@@ -112,23 +111,14 @@ export function Composer({ busy, onSend }: ComposerProps) {
           <Label htmlFor={`${messageId}-model`} className="eyebrow">
             Model
           </Label>
-          <Select value={model} onValueChange={chooseModel} disabled={list.length === 0}>
-            <SelectTrigger id={`${messageId}-model`} className="w-72 max-w-full">
-              <SelectValue placeholder={models.isError ? 'The models could not be loaded.' : 'Loading models'} />
-            </SelectTrigger>
-            <SelectContent>
-              {groupModels(list).map((g) => (
-                <SelectGroup key={g.provider}>
-                  <SelectLabel>{g.provider || 'Other'}</SelectLabel>
-                  {g.models.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.id}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              ))}
-            </SelectContent>
-          </Select>
+          <ModelPicker
+            id={`${messageId}-model`}
+            models={list}
+            value={model}
+            onChange={chooseModel}
+            disabled={list.length === 0}
+            placeholder={models.isError ? 'The models could not be loaded.' : 'Loading models'}
+          />
         </div>
         <Choice legend="Verification mode" value={mode} options={modes} onChange={setMode} />
         {mode === 'sync' && <Choice legend="When a claim is outdated" value={policy} options={policies} onChange={setPolicy} />}

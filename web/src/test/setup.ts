@@ -11,7 +11,7 @@ class NoopResizeObserver {
 }
 
 // jsdom implements neither matchMedia nor ResizeObserver, and Radix and the
-// motion hooks use both. Tests that need a matching query replace matchMedia.
+// motion hooks use both; it also lacks scrollIntoView. Tests that need a matching query replace matchMedia.
 function installBrowserStubs() {
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
@@ -28,6 +28,8 @@ function installBrowserStubs() {
     }),
   })
   window.ResizeObserver = NoopResizeObserver
+  // cmdk scrolls the highlighted item into view, which jsdom does not implement.
+  Element.prototype.scrollIntoView = () => {}
 }
 
 // Tests that read files run in the Node environment, which has no window.
