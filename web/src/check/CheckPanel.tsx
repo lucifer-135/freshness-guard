@@ -7,11 +7,11 @@ import { ClaimText } from '@/claims/ClaimText'
 import { progressSentence } from '@/claims/progress'
 import { ScoreRing } from '@/claims/ScoreRing'
 import { useStaggeredClaims } from '@/claims/useStaggeredClaims'
-import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { reportKey } from '@/live/reportCache'
 import { useReport } from '@/live/useReport'
+import { MagneticButton } from '@/motion/MagneticButton'
 
 // The plugin's POST /freshness/check limit, counted in characters (runes).
 const MAX_CHARACTERS = 20000
@@ -80,10 +80,10 @@ export function CheckPanel() {
               {error}
             </p>
           )}
-          <Button type="submit" className="h-10" disabled={!canCheck}>
+          <MagneticButton type="submit" className="h-10" disabled={!canCheck}>
             <SearchCheck aria-hidden="true" />
             Check this answer
-          </Button>
+          </MagneticButton>
         </form>
 
         {data && (

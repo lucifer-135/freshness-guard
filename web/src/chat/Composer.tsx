@@ -4,11 +4,11 @@ import { useId, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { groupModels } from './models'
 import { getModels } from '@/api/client'
 import type { Mode, Policy } from '@/api/types'
-import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { MagneticButton } from '@/motion/MagneticButton'
 import { useStatus } from '@/shell/TopBar'
 
 const MODEL_KEY = 'fg.model'
@@ -137,10 +137,10 @@ export function Composer({ busy, onSend }: ComposerProps) {
         <Label htmlFor={messageId}>Message</Label>
         <Textarea id={messageId} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={onKeyDown} rows={3} />
       </div>
-      <Button type="submit" className="h-10" disabled={!canSend}>
+      <MagneticButton type="submit" className="h-10" disabled={!canSend}>
         <Send aria-hidden="true" />
         Send
-      </Button>
+      </MagneticButton>
     </form>
   )
 }
