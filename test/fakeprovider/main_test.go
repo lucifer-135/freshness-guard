@@ -180,3 +180,45 @@ func TestFakeHealReplacesValues(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(chatContent(t, HealModel, string(user))), &out))
 	assert.Equal(t, strings.Replace(Answer, "$20 per month", "$25 per month", 1), out.Text)
 }
+
+func embed(t *testing.T, body string) [][]float64 {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	newHandler().ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/v1/embeddings", strings.NewReader(body)))
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var resp struct {
+		Data []struct {
+			Index     int       `json:"index"`
+			Embedding []float64 `json:"embedding"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	vectors := make([][]float64, len(resp.Data))
+	for i, d := range resp.Data {
+		assert.Equal(t, i, d.Index)
+		vectors[i] = d.Embedding
+	}
+	return vectors
+}
+
+func TestEmbeddingsAreDeterministicAndNormalized(t *testing.T) {
+	one := embed(t, `{"model":"fake-embed","input":"What does Example Cloud Pro cost?"}`)
+	again := embed(t, `{"model":"fake-embed","input":["What does Example Cloud Pro cost?","hello"]}`)
+	require.Len(t, one, 1)
+	require.Len(t, again, 2)
+	assert.Len(t, one[0], 8)
+	assert.Equal(t, one[0], again[0], "the same text always gives the same vector")
+	assert.NotEqual(t, again[0], again[1])
+	for _, v := range again {
+		var sum float64
+		for _, x := range v {
+			sum += x * x
+		}
+		assert.InDelta(t, 1.0, sum, 1e-9, "vectors have length 1")
+	}
+}
+
+func TestEmbeddingsOfTextWithoutLettersAreValid(t *testing.T) {
+	v := embed(t, `{"input":"1234"}`)
+	assert.Equal(t, []float64{1, 0, 0, 0, 0, 0, 0, 0}, v[0])
+}

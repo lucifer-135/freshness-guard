@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -49,6 +50,7 @@ func newHandler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /v1/chat/completions", handleChat)
 	mux.HandleFunc("GET /v1/models", handleModels)
+	mux.HandleFunc("POST /v1/embeddings", handleEmbeddings)
 	mux.HandleFunc("POST /search", handleSearch)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok")) })
 	return mux
@@ -255,4 +257,61 @@ func writeJSON(w http.ResponseWriter, v any) {
 func main() {
 	log.Println("fakeprovider listening on :9000")
 	log.Fatal(http.ListenAndServe(":9000", newHandler()))
+}
+
+// embeddingDims is the size of the fake embeddings, small enough to read in a
+// test and large enough that different texts differ.
+const embeddingDims = 8
+
+// handleEmbeddings answers the OpenAI embeddings request that Bifrost's
+// semantic cache sends, so the cache can be tested without a real model.
+func handleEmbeddings(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Model string          `json:"model"`
+		Input json.RawMessage `json:"input"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+		return
+	}
+	var single string
+	var inputs []string
+	if json.Unmarshal(req.Input, &single) == nil {
+		inputs = []string{single}
+	} else if err := json.Unmarshal(req.Input, &inputs); err != nil {
+		http.Error(w, "input must be a string or an array of strings", http.StatusBadRequest)
+		return
+	}
+	data := make([]map[string]any, len(inputs))
+	for i, text := range inputs {
+		data[i] = map[string]any{"object": "embedding", "index": i, "embedding": fakeEmbedding(text)}
+	}
+	writeJSON(w, map[string]any{
+		"object": "list", "data": data, "model": req.Model,
+		"usage": map[string]any{"prompt_tokens": len(inputs), "total_tokens": len(inputs)},
+	})
+}
+
+// fakeEmbedding counts the letters of text into embeddingDims buckets and
+// scales the counts to length 1. Text without letters maps to the first axis.
+func fakeEmbedding(text string) []float64 {
+	v := make([]float64, embeddingDims)
+	for _, r := range strings.ToLower(text) {
+		if r >= 'a' && r <= 'z' {
+			v[int(r-'a')%embeddingDims]++
+		}
+	}
+	var sum float64
+	for _, x := range v {
+		sum += x * x
+	}
+	if sum == 0 {
+		v[0] = 1
+		return v
+	}
+	norm := math.Sqrt(sum)
+	for i := range v {
+		v[i] /= norm
+	}
+	return v
 }

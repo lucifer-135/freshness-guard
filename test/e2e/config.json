@@ -6,7 +6,20 @@
       "network_config": { "base_url": "http://fakeprovider:9000", "allow_private_network": true }
     }
   },
+  "vector_store": { "enabled": true, "type": "chromem", "config": {} },
+  "setup_token": "e2e-setup-token",
   "plugins": [
+    {
+      "enabled": true,
+      "name": "semantic_cache",
+      "config": {
+        "provider": "openai",
+        "embedding_model": "fake-embed",
+        "dimension": 8,
+        "ttl": "1h",
+        "threshold": 0.95
+      }
+    },
     {
       "enabled": true,
       "name": "freshness-guard",
@@ -20,6 +33,7 @@
         "models": { "extract": "openai/fake-extract", "judge": "openai/fake-judge", "heal": "openai/fake-heal" },
         "fallbacks": { "extract": [], "judge": [], "heal": [] },
         "sync_timeout_ms": 20000,
+        "cache_purge": { "setup_token": "e2e-setup-token" },
         "daily_credit_budget": 1000,
         "db_path": "/app/data/freshness.db"
       }

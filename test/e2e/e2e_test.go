@@ -8,6 +8,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -99,6 +100,7 @@ type freshnessReport struct {
 	Policy       string  `json:"policy"`
 	HealedText   string  `json:"healed_text"`
 	Blocked      bool    `json:"blocked"`
+	CacheID      string  `json:"cache_id"`
 	Claims       []claim `json:"claims"`
 }
 
@@ -357,4 +359,39 @@ func TestWebAppIsServed(t *testing.T) {
 
 	resp = pluginRequest(t, http.MethodGet, "/freshness/ui/chat", "", false)
 	assert.Equal(t, page, readBody(t, resp))
+}
+
+// The fake answer always contains the outdated $20 price, so once its report
+// is complete, the plugin must remove the answer from Bifrost's semantic cache.
+func TestCachePurgeRemovesOutdatedAnswer(t *testing.T) {
+	key := fmt.Sprintf("e2e-purge-%d", time.Now().UnixNano())
+	body := fmt.Sprintf(`{"model":"openai/fake-model","messages":[{"role":"user","content":"What does Example Cloud Pro cost? (%s)"}]}`, key)
+	headers := map[string]string{"x-bf-cache-key": key, "x-bf-freshness": "async"}
+
+	first := postChat(t, body, headers)
+	readBody(t, first)
+	require.Equal(t, http.StatusOK, first.StatusCode)
+	cacheID := first.Header.Get("X-Bifrost-Cache-Id")
+	require.NotEmpty(t, cacheID, "Bifrost sends the cache entry ID of a cacheable request")
+	assert.NotEqual(t, "true", first.Header.Get("X-Bifrost-Cache-Hit"), "the first request cannot be a cache hit")
+
+	rep := getReport(t, first.Header.Get("X-Freshness-Report-Id"))
+	require.Equal(t, "complete", rep.Status, rep.Reason)
+	assert.GreaterOrEqual(t, rep.StaleCount, 1)
+	assert.Equal(t, cacheID, rep.CacheID, "the report records the cache entry of its answer")
+
+	// The purge runs just after the report is delivered, so ask until the
+	// entry is gone. A request that is still answered from the cache is
+	// checked again, which also removes the entry.
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		again := postChat(t, body, headers)
+		readBody(t, again)
+		require.Equal(t, http.StatusOK, again.StatusCode)
+		if again.Header.Get("X-Bifrost-Cache-Hit") != "true" {
+			return
+		}
+		require.True(t, time.Now().Before(deadline), "the outdated answer was still served from the cache after 10 seconds")
+		time.Sleep(500 * time.Millisecond)
+	}
 }
