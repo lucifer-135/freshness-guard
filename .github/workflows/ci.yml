@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  go:
+    runs-on: ubuntu-latest
+    # The plugin must be built with the same Go version as the Bifrost binary.
+    container: golang:1.27.3-trixie
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check formatting
+        run: test -z "$(gofmt -l .)"
+      - run: go vet ./...
+      - run: go test -race ./internal/... ./plugin/... ./test/fakeprovider/... ./cmd/...
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - name: Fetch the Bifrost source
+        run: bash deploy/fetch-bifrost.sh
+      - name: Start Bifrost with the plugin and the fake providers
+        run: docker compose -f deploy/docker-compose.yml --profile tools up -d --build bifrost-e2e
+      - name: End-to-end tests
+        run: docker compose -f deploy/docker-compose.yml run --rm e2e
+      - name: Browser tests and accessibility scan
+        run: docker compose -f deploy/docker-compose.yml run --rm webtest
+      - name: Show the gateway log
+        if: failure()
+        run: docker compose -f deploy/docker-compose.yml logs bifrost-e2e
