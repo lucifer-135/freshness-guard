@@ -24,6 +24,8 @@ type fakeGateway struct {
 	err       error
 	models    []gateway.Model
 	modelsErr error
+	// modelsDelay makes Models answer late, as Bifrost does when it asks every provider for its list.
+	modelsDelay time.Duration
 
 	body         string
 	mode, policy string
@@ -34,7 +36,16 @@ func (f *fakeGateway) Chat(_ context.Context, body []byte, mode, policy string) 
 	return f.resp, f.err
 }
 
-func (f *fakeGateway) Models(context.Context) ([]gateway.Model, error) { return f.models, f.modelsErr }
+func (f *fakeGateway) Models(ctx context.Context) ([]gateway.Model, error) {
+	if f.modelsDelay > 0 {
+		select {
+		case <-time.After(f.modelsDelay):
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+	return f.models, f.modelsErr
+}
 
 type fakeCredits struct{ used, daily int }
 
@@ -162,6 +173,23 @@ func TestStatusEndpoint(t *testing.T) {
 	rec = do(chatHandler(&fakeGateway{modelsErr: errors.New("down")}), http.MethodGet, "/freshness/status", "t", "")
 	assert.JSONEq(t, `{"gateway":{"reachable":false,"models":0},"credits":{"used":3,"budget":30},`+
 		`"settings":{"default_mode":"","default_policy":"","sync_timeout_ms":0}}`, rec.Body.String())
+}
+
+// On the real stack Bifrost's model list takes about two seconds, because it asks
+// each provider. The status must still call such a gateway reachable.
+func TestStatusWaitsForASlowModelList(t *testing.T) {
+	g := &fakeGateway{models: []gateway.Model{{ID: "groq/a", Provider: "groq"}}, modelsDelay: 2500 * time.Millisecond}
+	rec := do(chatHandler(g), http.MethodGet, "/freshness/status", "t", "")
+	require.Equal(t, http.StatusOK, rec.Code)
+	var body struct {
+		Gateway struct {
+			Reachable bool `json:"reachable"`
+			Models    int  `json:"models"`
+		} `json:"gateway"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.True(t, body.Gateway.Reachable)
+	assert.Equal(t, 1, body.Gateway.Models)
 }
 
 func TestStatusIncludesSettings(t *testing.T) {

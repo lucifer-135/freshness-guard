@@ -31,7 +31,11 @@ type Settings struct {
 	SyncTimeoutMS int    `json:"sync_timeout_ms"`
 }
 
-const statusModelsTimeout = 2 * time.Second
+// statusModelsTimeout bounds the gateway check in the status route. Bifrost asks
+// every provider for its model list, which takes about two seconds on the real
+// stack; a gateway that is down refuses the connection at once, so a longer wait
+// only applies to a slow but working gateway.
+const statusModelsTimeout = 5 * time.Second
 
 type chatRequest struct {
 	Model    string          `json:"model"`
