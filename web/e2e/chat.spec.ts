@@ -12,12 +12,11 @@ test('an async answer is underlined as verdicts arrive and explains itself', asy
 
   await price.focus()
   await page.keyboard.press('Enter')
-  const card = page.getByRole('dialog')
+  const card = page.getByRole('complementary', { name: 'Claims in this answer' })
   await expect(card).toContainText('Current value: $25 per month')
   await expect(card.getByRole('heading', { name: 'Evidence from live sources' })).toBeVisible()
   await expect(card.getByRole('heading', { name: 'Inference by the judge model' })).toBeVisible()
-  await page.keyboard.press('Escape')
 
-  await page.getByRole('switch', { name: 'Show corrected answer' }).click()
+  await page.getByRole('radio', { name: 'Corrected' }).click()
   await expect(page.locator('ins').filter({ hasText: '$25 per month' }).first()).toBeVisible()
 })

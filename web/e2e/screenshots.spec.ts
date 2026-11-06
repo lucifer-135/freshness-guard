@@ -24,12 +24,11 @@ test('README screenshots', async ({ page }) => {
 
   await outdated.focus()
   await page.keyboard.press('Enter')
-  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.getByRole('complementary', { name: 'Claims in this answer' })).toContainText('Why this claim was checked')
   await settle(page)
   await page.screenshot({ path: 'docs-images/chat.png' })
-  await page.keyboard.press('Escape')
 
-  await page.getByRole('switch', { name: 'Show corrected answer' }).click()
+  await page.getByRole('radio', { name: 'Corrected' }).click()
   await expect(page.locator('ins').first()).toBeVisible()
   await settle(page)
   await page.screenshot({ path: 'docs-images/corrected.png' })
