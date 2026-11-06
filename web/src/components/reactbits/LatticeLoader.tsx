@@ -3,7 +3,7 @@
  * Copyright (c) 2026 David Haz. Licensed under MIT + Commons Clause; the full
  * licence is in web/public/react-bits-license.md. This file is not under the
  * Apache License 2.0 that covers the rest of Freshness Guard.
- * Changes: default colours are design tokens, not hex; the last finished mark is kept in state, and the screen-reader text is written to its element from the status effect, to satisfy react-hooks/refs and react-hooks/set-state-in-effect.
+ * Changes: default colours are design tokens, not hex; the last finished mark is kept in state, and the screen-reader text is written to its element from the status effect, to satisfy react-hooks/refs and react-hooks/set-state-in-effect; the elapsed time uses the --text-subtle token instead of opacity, which failed the 4.5:1 contrast check.
  */
 
 import React, { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
@@ -253,7 +253,7 @@ const LatticeLoader: React.FC<LatticeLoaderProps> = ({
       {showTimer ? (
         <span
           ref={timerRef}
-          className="font-mono tabular-nums opacity-60 [font-size:calc(var(--ll-font)*0.875)]"
+          className="font-mono tabular-nums [color:var(--text-subtle)] [font-size:calc(var(--ll-font)*0.875)]"
           aria-hidden="true"
         >
           0.0s
