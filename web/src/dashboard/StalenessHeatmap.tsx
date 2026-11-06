@@ -192,14 +192,14 @@ export function StalenessHeatmap() {
 
   const lb = leaderboard.data
   return (
-    <section aria-labelledby={`${summaryId}-title`} className="space-y-4 rounded-xl border border-border bg-surface-2 p-4">
+    <section aria-labelledby={`${summaryId}-title`} className="h-full space-y-4 rounded-xl border border-border bg-surface-2 p-4">
       <h2 id={`${summaryId}-title`} className="text-lg font-semibold">
         Claim rates by model and topic
       </h2>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
         <Segmented label="Show the rate of" value={metric} options={metricOptions} onChange={setMetric} />
         <Segmented label="Time window" value={period} options={windowOptions} onChange={setPeriod} />
-        <Button variant="secondary" aria-pressed={asTable} onClick={() => setAsTable((v) => !v)}>
+        <Button variant="secondary" onClick={() => setAsTable((v) => !v)}>
           {asTable ? 'View as heatmap' : 'View as table'}
         </Button>
       </div>

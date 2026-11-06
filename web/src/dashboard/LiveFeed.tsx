@@ -29,7 +29,7 @@ export function LiveFeed() {
   const waiting = frozen ? latest.filter((r) => !frozen.some((f) => f.id === r.id)).length : 0
 
   return (
-    <section aria-labelledby="live-feed-title" className="@container flex h-full flex-col gap-3 rounded-xl border border-border bg-surface-2 p-4">
+    <section aria-labelledby="live-feed-title" className="@container flex h-full flex-col gap-3 rounded-xl lg:absolute lg:inset-0 border border-border bg-surface-2 p-4">
       <div className="flex items-center justify-between gap-3">
         <h2 id="live-feed-title" className="text-lg font-semibold">
           Live verification feed
@@ -53,7 +53,7 @@ export function LiveFeed() {
       {reports.data && shown.length === 0 && (
         <p className="text-text-muted">No answers have been checked yet. Send a message in the chat to see results here.</p>
       )}
-      <ol aria-label="Recent reports" className="divide-y divide-border overflow-y-auto rounded-lg border border-border bg-surface-1 empty:hidden">
+      <ol aria-label="Recent reports" className="min-h-0 divide-y divide-border overflow-y-auto rounded-lg border border-border bg-surface-1 empty:hidden">
         <AnimatePresence initial={false}>
           {shown.map((r) => (
             <motion.li
@@ -62,7 +62,7 @@ export function LiveFeed() {
               animate={reduced ? { opacity: 1 } : { opacity: 1, y: 0 }}
               transition={{ duration: reduced ? 0.08 : 0.22 }}
             >
-              <Link to={`/reports/${r.id}`} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-3 py-2 text-sm hover:bg-surface-3 @lg:h-10 @lg:flex-nowrap @lg:py-0">
+              <Link to={`/reports/${r.id}`} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-3 py-2 text-sm hover:bg-surface-3 focus-visible:outline-offset-[-2px] @lg:h-10 @lg:flex-nowrap @lg:py-0">
                 <ScoreRing score={r.score} size="sm" />
                 <span className="min-w-0 flex-1 truncate font-mono text-xs" title={r.model || undefined}>
                   {r.model || 'Pasted text'}

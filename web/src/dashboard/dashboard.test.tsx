@@ -257,7 +257,11 @@ describe('DashboardPage heatmap', () => {
     ;({ fake } = setup())
     const user = userEvent.setup()
     await screen.findByLabelText(pricingSentence)
-    await user.click(screen.getByRole('button', { name: 'View as table' }))
+    const toggle = screen.getByRole('button', { name: 'View as table' })
+    await user.click(toggle)
+    // The label names the next view; a pressed state on top of it would contradict the label.
+    expect(toggle).toHaveAccessibleName('View as heatmap')
+    expect(toggle).not.toHaveAttribute('aria-pressed')
     const table = screen.getByRole('table', { name: 'Claim counts by model and category' })
     expect(within(table).getAllByRole('columnheader').map((h) => h.textContent)).toEqual([
       'Model',
@@ -335,6 +339,18 @@ describe('DashboardPage live feed', () => {
     ;({ fake } = setup({ 'GET /freshness/reports': () => json(200, { reports: [completeReport({ id: 'r1', model: '' })] }) }))
     const [link] = await within(await screen.findByRole('list', { name: 'Recent reports' })).findAllByRole('link')
     expect(link).toHaveTextContent('Pasted text')
+  })
+
+  it('fits the feed to the height of the heatmap and keeps its focus rings inside the list', async () => {
+    ;({ fake } = setup({ 'GET /freshness/reports': () => json(200, { reports: reports('r1') }) }))
+    const list = await screen.findByRole('list', { name: 'Recent reports' })
+    // On wide screens the feed fills its grid cell instead of growing the row,
+    // so the heatmap column does not leave an empty area below it.
+    const feed = screen.getByRole('region', { name: 'Live verification feed' })
+    expect(feed).toHaveClass('lg:absolute', 'lg:inset-0')
+    expect(feed.parentElement).toHaveClass('lg:relative')
+    expect(list).toHaveClass('min-h-0')
+    for (const link of await within(list).findAllByRole('link')) expect(link).toHaveClass('focus-visible:outline-offset-[-2px]')
   })
 
   it('freezes the feed while it is paused and keeps focus on the pause button', async () => {

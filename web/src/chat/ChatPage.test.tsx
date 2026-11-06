@@ -313,6 +313,15 @@ describe('ChatPage', () => {
     for (const row of within(inspector).getAllByRole('button')) expect(row).not.toHaveClass('bg-surface-2')
   })
 
+  it('centres the conversation and the inspector on wide screens', async () => {
+    fake = setup(streamedAnswer, completeReport())
+    await send()
+    await screen.findByText('2 claims checked. 1 claim is outdated.', {}, { timeout: 3000 })
+    // DESIGN.md 7.1: a centre column of at most 760px plus the 360px inspector and a 24px gap.
+    const layout = screen.getByRole('complementary', { name: 'Claims in this answer' }).parentElement
+    expect(layout).toHaveClass('mx-auto', 'max-w-[1144px]')
+  })
+
   it('keeps the inspector row focus ring inside the clipped list and marks hover and selection visibly', async () => {
     fake = setup(streamedAnswer, completeReport())
     await send()

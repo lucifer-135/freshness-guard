@@ -61,6 +61,12 @@ describe('ReportPage', () => {
     expect(screen.getByText('2 claims checked. 1 claim is outdated.')).toBeInTheDocument()
   })
 
+  it('does not link a claim to the report the reader is already on', async () => {
+    fake = renderAt('/reports/r1', { 'GET /freshness/reports/r1': () => json(200, completeReport()) })
+    await screen.findByRole('heading', { name: 'Original answer' })
+    expect(screen.queryByRole('link', { name: 'Open full report' })).toBeNull()
+  })
+
   it('says when the answer was blocked', async () => {
     fake = renderAt('/reports/r1', { 'GET /freshness/reports/r1': () => json(200, completeReport({ blocked: true })) })
     expect(await screen.findByText('This answer was blocked before it reached the user.')).toBeInTheDocument()

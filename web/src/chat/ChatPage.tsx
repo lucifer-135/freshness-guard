@@ -96,7 +96,8 @@ function Conversation() {
     report.data && <ClaimInspector report={report.data} selectedId={selectedId} onSelect={select} />
 
   return (
-    <div className="flex gap-6">
+    // DESIGN.md 7.1: the conversation and the inspector sit in the centre of wide screens.
+    <div className="mx-auto flex max-w-[1144px] gap-6">
       <div className="min-w-0 flex-1 space-y-4 xl:max-w-[760px]">
         <div aria-live="polite" className="sr-only">
           {announcement}

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useMatch } from 'react-router'
 import { decayModel } from './decay'
 import { DecayCurve } from './DecayCurve'
 import { formatDate, percent } from './format'
@@ -64,6 +64,7 @@ export function ExplainCard({ claim, report }: { claim: Claim; report: Report })
   const Icon = meta.icon
   const model = decayModel(claim, report)
   const outdated = claim.verdict === 'STALE' || claim.verdict === 'WRONG'
+  const onReportPage = useMatch('/reports/:id')?.params.id === report.id
   const description = claim.verdict === 'UNVERIFIABLE' && claim.rationale && !claim.checked ? claim.rationale : meta.description
 
   return (
@@ -153,9 +154,12 @@ export function ExplainCard({ claim, report }: { claim: Claim; report: Report })
         <p className="text-text-muted">Facts of this kind rarely change, so no decay curve is shown.</p>
       )}
 
-      <Link to={`/reports/${report.id}`} className="inline-block pt-2 text-link underline underline-offset-4 hover:text-link-strong">
-        Open full report
-      </Link>
+      {/* On the report page itself the link would only reload the page the reader is on. */}
+      {!onReportPage && (
+        <Link to={`/reports/${report.id}`} className="inline-block pt-2 text-link underline underline-offset-4 hover:text-link-strong">
+          Open full report
+        </Link>
+      )}
     </div>
   )
 }

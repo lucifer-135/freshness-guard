@@ -14,7 +14,8 @@ export function DashboardPage() {
         <div className="lg:col-span-8">
           <StalenessHeatmap />
         </div>
-        <div className="lg:col-span-4">
+        {/* The feed fills this cell instead of growing the row, so the heatmap column has no empty area below it. */}
+        <div className="lg:relative lg:col-span-4 lg:min-h-[24rem]">
           <LiveFeed />
         </div>
       </div>
