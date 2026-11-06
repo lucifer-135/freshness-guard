@@ -7,5 +7,5 @@ beforeEach(() => clearToken())
 
 it('asks for the plugin API token first', () => {
   render(<App />)
-  expect(screen.getByRole('heading', { level: 1, name: 'Connect to Freshness Guard' })).toBeInTheDocument()
+  expect(screen.getByRole('heading', { level: 2, name: 'Try it' })).toBeInTheDocument()
 })

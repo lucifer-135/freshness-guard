@@ -7,7 +7,7 @@ export const fakeAnswer = 'Example Cloud Pro costs $20 per month, and its curren
 export async function signIn(page: Page) {
   await page.goto('chat')
   await page.getByLabel('API token').fill(process.env.FG_TOKEN ?? 'e2e-token')
-  await page.getByRole('button', { name: 'Connect' }).click()
+  await page.getByRole('button', { name: 'Open the chat' }).click()
   await expect(page.getByLabel('Message')).toBeVisible()
 }
 

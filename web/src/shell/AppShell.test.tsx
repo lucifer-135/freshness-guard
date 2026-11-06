@@ -82,7 +82,7 @@ describe('AppShell', () => {
     renderAt('/chat')
     await userEvent.click(screen.getByRole('button', { name: 'Sign out' }))
     expect(getToken()).toBeNull()
-    expect(screen.getByRole('heading', { level: 1, name: 'Connect to Freshness Guard' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: 'Try it' })).toBeInTheDocument()
   })
 
   it('shows a not-found page', () => {

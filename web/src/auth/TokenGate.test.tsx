@@ -20,7 +20,7 @@ function renderGate() {
 
 async function connect(token: string) {
   await userEvent.type(screen.getByLabelText('API token'), token)
-  await userEvent.click(screen.getByRole('button', { name: 'Connect' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Open the chat' }))
 }
 
 describe('TokenGate', () => {
@@ -31,7 +31,33 @@ describe('TokenGate', () => {
   it('asks for the token when none is stored', () => {
     fake = fakeFetch({})
     renderGate()
-    expect(screen.getByRole('heading', { level: 1, name: 'Connect to Freshness Guard' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: 'Try it' })).toBeInTheDocument()
+  })
+
+  it('opens on the home page, which explains the product before any API call', () => {
+    fake = fakeFetch({})
+    renderGate()
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      'Freshness Guard finds the facts in an LLM answer that may have changed',
+    )
+    expect(screen.getByRole('heading', { level: 2, name: 'How it works' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: 'What was measured' })).toBeInTheDocument()
+    expect(screen.getByText(/not yet independently reviewed/)).toBeInTheDocument()
+    expect(screen.getByText('x-bf-freshness: async | sync | off')).toBeInTheDocument()
+    expect(fake.requests).toHaveLength(0)
+  })
+
+  it('lets the reader move the scan line across the example answer with the keyboard', async () => {
+    fake = fakeFetch({})
+    renderGate()
+    const scan = screen.getByRole('slider', { name: 'Scan position' })
+    scan.focus()
+    await userEvent.keyboard('{Home}')
+    expect(scan).toHaveAttribute('aria-valuenow', '0')
+    await userEvent.keyboard('{ArrowRight}')
+    expect(scan).toHaveAttribute('aria-valuenow', '5')
+    await userEvent.keyboard('{End}')
+    expect(scan).toHaveAttribute('aria-valuenow', '100')
   })
 
   it('rejects a token the API does not accept', async () => {
@@ -70,7 +96,7 @@ describe('TokenGate', () => {
       await apiFetch('/freshness/status').catch(() => {})
       await apiFetch('/freshness/status').catch(() => {})
     })
-    expect(screen.getByRole('heading', { level: 1, name: 'Connect to Freshness Guard' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: 'Try it' })).toBeInTheDocument()
     expect(screen.getAllByText('The token is no longer accepted. Enter the token again.')).toHaveLength(1)
     expect(getToken()).toBeNull()
   })
