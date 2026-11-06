@@ -45,7 +45,7 @@ function Stat({
 }) {
   const labelId = useId()
   return (
-    <div className="py-4 lg:px-6 lg:first:pl-0">
+    <div className="py-4 lg:row-span-3 lg:grid lg:grid-rows-subgrid lg:px-6 lg:first:pl-0">
       <dt id={labelId} className="text-sm text-text-muted">
         {label}
       </dt>
@@ -90,7 +90,7 @@ export function SummaryRow() {
   const s = summary.data
   return (
     // One strip of figures divided by hairlines; each figure reads as label, value, detail.
-    <dl className="grid border-y border-border sm:grid-cols-2 lg:grid-cols-4 lg:divide-x lg:divide-border">
+    <dl className="grid border-y border-border sm:grid-cols-2 lg:grid-cols-4 lg:grid-rows-[auto_auto_auto] lg:divide-x lg:divide-border">
       <Stat label="Answers checked in the last 24 hours" value={s.answers} />
       <Stat
         label="Share of checked claims that were outdated"

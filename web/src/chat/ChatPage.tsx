@@ -23,8 +23,8 @@ const sections: { value: Section; label: string }[] = [
 export function ChatPage() {
   const [section, setSection] = useState<Section>('chat')
   return (
-    // The chat and the pasted-text check share one centred frame, so switching between them moves nothing.
-    <section className="mx-auto max-w-[1144px] space-y-4">
+    // The shell's frame holds the chat and the pasted-text check, so switching between them, or to another page, moves nothing.
+    <section className="space-y-4">
       <h1 className="sr-only">Freshness-checked chat</h1>
       <Segmented label="Page section" value={section} options={sections} onChange={setSection} />
       {section === 'chat' ? <Conversation /> : <CheckPanel />}
@@ -98,7 +98,7 @@ function Conversation() {
 
   return (
     // DESIGN.md 7.1: the conversation and the inspector sit in the centre of wide screens.
-    <div className="mx-auto flex max-w-[1144px] gap-6">
+    <div className="flex gap-6">
       <div className="min-w-0 flex-1 space-y-4 xl:max-w-[760px]">
         <div aria-live="polite" className="sr-only">
           {announcement}

@@ -31,7 +31,9 @@ export function TopBar() {
   }
 
   return (
-    <header className="sticky top-0 z-10 flex flex-wrap items-center gap-x-4 gap-y-0 border-b border-border bg-surface-1 px-4">
+    <header className="sticky top-0 z-10 border-b border-border bg-surface-1 px-4 lg:px-6">
+      {/* The bar spans the window; its contents sit in the same 1200px frame as every page. */}
+      <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-4 gap-y-0">
       <p className="py-3">
         <Logo />
       </p>
@@ -53,6 +55,7 @@ export function TopBar() {
           <LogOut aria-hidden="true" />
           Sign out
         </Button>
+      </div>
       </div>
     </header>
   )

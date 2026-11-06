@@ -330,7 +330,8 @@ describe('ChatPage', () => {
   it('keeps the chat and the pasted-text check in one centred frame with their switch', async () => {
     fake = setup(streamedAnswer, completeReport())
     const frame = (await screen.findByRole('radiogroup', { name: 'Page section' })).closest('section')
-    expect(frame).toHaveClass('mx-auto', 'max-w-[1144px]')
+    // The shell's 1200px frame holds every page, so the chat adds no frame of its own and its left edge matches the others.
+    expect(frame).not.toHaveClass('max-w-[1144px]')
   })
 
   it('draws one container around the composer, with borderless fields inside it', async () => {
@@ -347,7 +348,9 @@ describe('ChatPage', () => {
     await screen.findByText('2 claims checked. 1 claim is outdated.', {}, { timeout: 3000 })
     // DESIGN.md 7.1: a centre column of at most 760px plus the 360px inspector and a 24px gap.
     const layout = screen.getByRole('complementary', { name: 'Claims in this answer' }).parentElement
-    expect(layout).toHaveClass('mx-auto', 'max-w-[1144px]')
+    // 760px conversation, 24px gap and 360px inspector, aligned to the shell frame's left edge.
+    expect(layout).not.toHaveClass('max-w-[1144px]')
+    expect(layout?.firstElementChild).toHaveClass('xl:max-w-[760px]')
   })
 
   it('keeps the inspector row focus ring inside the clipped list and marks hover and selection visibly', async () => {

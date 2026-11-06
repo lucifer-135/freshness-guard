@@ -149,6 +149,9 @@ describe('DashboardPage summary row', () => {
     const strip = label.closest('dl')
     expect(strip).not.toBeNull()
     expect(strip!.querySelectorAll('.rounded-xl')).toHaveLength(0)
+    // Each figure spans three subgrid rows, so a label that wraps never pushes its value off the shared baseline.
+    expect(strip).toHaveClass('lg:grid-rows-[auto_auto_auto]')
+    expect(label.parentElement).toHaveClass('lg:row-span-3', 'lg:grid-rows-subgrid')
     for (const name of ['Claim rates by model and topic', 'Live verification feed']) {
       const section = screen.getByRole('region', { name })
       expect(section).not.toHaveClass('rounded-xl')
