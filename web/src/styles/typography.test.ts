@@ -26,6 +26,10 @@ it('themes text selection, the caret and scrollbars from the palette', () => {
   expect(css).toMatch(/scrollbar-color:\s*var\(--border-strong\)\s+transparent/)
 })
 
+it('keeps the pointer field out of the 1200px content frame', () => {
+  expect(css).toMatch(/\.pointer-field\s*\{[^}]*mask-image:\s*linear-gradient\(90deg,[^;]*calc\(50% - 600px\)[^;]*calc\(50% \+ 600px\)/)
+})
+
 it('tightens and balances the main headings', () => {
   expect(css).toMatch(/h1,\s*h2\s*\{[^}]*letter-spacing:\s*-0\.01em[^}]*text-wrap:\s*balance/)
 })

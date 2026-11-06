@@ -31,7 +31,7 @@ export function LiveFeed() {
   const waiting = frozen ? latest.filter((r) => !frozen.some((f) => f.id === r.id)).length : 0
 
   return (
-    <section aria-labelledby="live-feed-title" className="@container flex h-full flex-col gap-3 lg:absolute lg:inset-0">
+    <section aria-labelledby="live-feed-title" className="@container flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
         <h2 id="live-feed-title" className="text-lg font-semibold">
           Live verification feed
@@ -55,7 +55,7 @@ export function LiveFeed() {
       {reports.data && shown.length === 0 && (
         <p className="text-text-muted">No answers have been checked yet. Send a message in the chat to see results here.</p>
       )}
-      <ol aria-label="Recent reports" className="min-h-0 shrink-0 divide-y divide-border overflow-y-auto rounded-lg border border-border bg-surface-1 empty:hidden">
+      <ol aria-label="Recent reports" className="divide-y divide-border rounded-lg border border-border bg-surface-1 empty:hidden">
         <AnimatePresence initial={false}>
           {shown.slice(0, FEED_ROWS).map((r) => (
             <motion.li

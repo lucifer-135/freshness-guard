@@ -56,6 +56,8 @@ describe('AppShell', () => {
     renderAt('/chat')
     expect(document.querySelector('[data-pointer-field]')).not.toBeNull()
     expect(document.querySelector('canvas')).toBeNull()
+    // Every page shares one frame, and the field lives in the margins outside it, never under text.
+    expect(screen.getByRole('main').firstElementChild).toHaveClass('mx-auto', 'max-w-[1200px]')
   })
 
   it('draws no cursor aura', () => {

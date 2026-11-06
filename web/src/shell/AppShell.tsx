@@ -29,9 +29,12 @@ export function AppShell() {
       </a>
       <TopBar />
       <main id="main" ref={main} tabIndex={-1} className="min-w-0 flex-1 p-4 outline-none lg:p-6">
-        <ChatProvider>
-          <Outlet />
-        </ChatProvider>
+        {/* One frame for every page; the pointer field lives in the margins outside it. */}
+        <div className="mx-auto max-w-[1200px]">
+          <ChatProvider>
+            <Outlet />
+          </ChatProvider>
+        </div>
       </main>
     </div>
   )

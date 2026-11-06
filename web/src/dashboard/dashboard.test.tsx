@@ -355,15 +355,12 @@ describe('DashboardPage live feed', () => {
     expect(link).toHaveTextContent('Pasted text')
   })
 
-  it('fits the feed to the height of the heatmap and keeps its focus rings inside the list', async () => {
+  it('lets the feed take its own height, so the link to the full list always shows, and keeps focus rings inside the list', async () => {
     ;({ fake } = setup({ 'GET /freshness/reports': () => json(200, { reports: reports('r1') }) }))
     const list = await screen.findByRole('list', { name: 'Recent reports' })
-    // On wide screens the feed fills its grid cell instead of growing the row,
-    // so the heatmap column does not leave an empty area below it.
+    // Eight rows are about as tall as the heatmap, so the feed no longer needs to be pinned to the row.
     const feed = screen.getByRole('region', { name: 'Live verification feed' })
-    expect(feed).toHaveClass('lg:absolute', 'lg:inset-0')
-    expect(feed.parentElement).toHaveClass('lg:relative')
-    expect(list).toHaveClass('min-h-0')
+    expect(feed).not.toHaveClass('lg:absolute')
     for (const link of await within(list).findAllByRole('link')) expect(link).toHaveClass('focus-visible:outline-offset-[-2px]')
   })
 

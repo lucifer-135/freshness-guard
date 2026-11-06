@@ -13,6 +13,8 @@ it('draws the mark as a drained score ring ending in a dot for today, in the tex
   expect(html).toContain('aria-hidden="true"')
   expect(html).toContain('Freshness Guard')
   expect(html).toMatch(/stroke="currentColor"/)
+  // A faint full track under the arc makes it read as a gauge, not as a loading spinner.
+  expect(html).toMatch(/<circle[^>]*opacity="0\.3"/)
   // Colour means verdict, so the mark carries no saturated colour of its own.
   expect(html).not.toMatch(/#[0-9a-f]{3,8}|var\(--status/i)
 })

@@ -337,6 +337,8 @@ describe('ChatPage', () => {
     fake = setup(streamedAnswer, completeReport())
     const field = await screen.findByLabelText('Message')
     expect(field).toHaveClass('border-0')
+    // The form's fill marks it as one container; its controls keep their own edges.
+    expect(field.closest('form')).not.toHaveClass('border')
   })
 
   it('centres the conversation and the inspector on wide screens', async () => {

@@ -164,6 +164,8 @@
   .pointer-field {
     background-image: radial-gradient(circle, color-mix(in oklab, var(--text) 9%, transparent) 1px, transparent 1.5px);
     background-size: 24px 24px;
+    /* The field stays in the margins outside the 1200px content frame, so it never sits under text. */
+    mask-image: linear-gradient(90deg, black calc(50% - 640px), transparent calc(50% - 600px), transparent calc(50% + 600px), black calc(50% + 640px));
   }
 
   .pointer-field::after {
