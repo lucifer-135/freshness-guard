@@ -25,7 +25,7 @@ export function ClaimInspector({ report, selectedId, onSelect }: ClaimInspectorP
   const unplaced = new Set(segmentAnswer(report.answer_text, report.claims).unplaced.map((c) => c.id))
   if (report.claims.length === 0) return <p className="text-sm text-text-muted">This answer has no claims to list.</p>
   return (
-    <ul className="space-y-2">
+    <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
       {byRisk(report.claims).map((c) => {
         const status = uiStatus(c, report.status)
         const meta = STATUS_META[status]
@@ -38,7 +38,7 @@ export function ClaimInspector({ report, selectedId, onSelect }: ClaimInspectorP
               onClick={() => onSelect(c.id)}
               disabled={unplaced.has(c.id)}
               aria-expanded={selected}
-              className="flex w-full items-start gap-3 rounded-md border border-border bg-surface-2 p-2 text-left transition-colors duration-[var(--dur-hover)] hover:border-border-strong aria-expanded:border-border-strong disabled:cursor-default"
+              className="flex w-full items-start gap-3 p-3 text-left transition-colors duration-[var(--dur-hover)] hover:bg-surface-1 aria-expanded:bg-surface-1 aria-expanded:shadow-[inset_2px_0_0_var(--accent)] disabled:cursor-default"
             >
               {status === 'pending' ? (
                 <span aria-hidden="true" className="inline-flex size-7 shrink-0 items-center justify-center">
@@ -59,7 +59,7 @@ export function ClaimInspector({ report, selectedId, onSelect }: ClaimInspectorP
               </span>
             </button>
             {selected && (
-              <div className="mt-2 rounded-md border border-border bg-surface-1 p-3">
+              <div className="border-t border-border bg-surface-1 p-3">
                 <ExplainCard claim={c} report={report} />
               </div>
             )}

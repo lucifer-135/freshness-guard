@@ -304,6 +304,15 @@ describe('ChatPage', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
+  it('lists claims in the inspector as hairline rows, not filled boxes', async () => {
+    fake = setup(streamedAnswer, completeReport())
+    await send()
+    await screen.findByText('2 claims checked. 1 claim is outdated.', {}, { timeout: 3000 })
+    const inspector = screen.getByRole('complementary', { name: 'Claims in this answer' })
+    expect(within(inspector).getByRole('list')).toHaveClass('divide-y')
+    for (const row of within(inspector).getAllByRole('button')) expect(row).not.toHaveClass('bg-surface-2')
+  })
+
   it('collapses an expanded claim when its row is chosen again', async () => {
     setScreenWide(true)
     fake = setup(streamedAnswer, completeReport())
