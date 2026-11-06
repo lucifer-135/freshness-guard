@@ -142,7 +142,7 @@ function Conversation() {
       </div>
       {report.data && (
         <aside aria-label="Claims in this answer" className="hidden w-[360px] shrink-0 space-y-3 xl:block">
-          <h2 className="eyebrow">Claims in this answer</h2>
+          <h2 className="text-sm font-semibold">Claims in this answer</h2>
           {inspector(wide ? selectedClaim : null)}
         </aside>
       )}

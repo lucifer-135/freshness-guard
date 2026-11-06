@@ -14,8 +14,8 @@ describe('Segmented', () => {
   it('is a labelled radio group that marks the chosen option', () => {
     render(<Segmented label="Verification mode" value="async" options={options} onChange={() => {}} />)
     expect(screen.getByRole('radiogroup', { name: 'Verification mode' })).toBeInTheDocument()
-    expect(screen.getByRole('radio', { name: 'Background' })).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getByRole('radio', { name: 'Off' })).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByRole('radio', { name: 'Background' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: 'Off' })).not.toBeChecked()
   })
 
   it('reports a clicked option', async () => {
@@ -54,9 +54,11 @@ describe('Segmented', () => {
     expect(onChange).toHaveBeenCalledWith('off')
   })
 
-  it('draws unselected labels in the primary text colour, which stays readable at the thumb overlay opacity', () => {
+  it('draws unselected labels muted and the chosen one in the primary text colour', () => {
     render(<Segmented label="Verification mode" value="async" options={options} onChange={() => {}} />)
-    expect(screen.getByRole('radiogroup').style.getPropertyValue('--rs-ink')).toBe('var(--text)')
+    // text-muted is about 7.4:1 on the surface-1 track, so unselected labels stay readable.
+    const label = screen.getByText('Off')
+    expect(label).toHaveClass('text-text-muted', 'peer-checked:text-text')
   })
 
   it('moves to the next option with the right arrow key', async () => {

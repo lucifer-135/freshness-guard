@@ -44,12 +44,12 @@ export function ReportPage() {
       <dl className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
         {facts.map(([k, v]) => (
           <div key={k}>
-            <dt className="eyebrow">{k}</dt>
+            <dt className="text-xs text-text-subtle">{k}</dt>
             <dd className="font-mono text-xs">{v}</dd>
           </div>
         ))}
         <div>
-          <dt className="eyebrow">Cost</dt>
+          <dt className="text-xs text-text-subtle">Cost</dt>
           <dd className="font-mono text-xs">
             <span>Checked in {(r.latency_ms / 1000).toFixed(1)} s</span>
             {' · '}
@@ -64,11 +64,11 @@ export function ReportPage() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-2 rounded-xl border border-border bg-surface-1 p-4">
-          <h2 className="eyebrow">Original answer</h2>
+          <h2 className="text-sm font-semibold">Original answer</h2>
           <ClaimText text={r.answer_text} claims={r.claims} reportStatus={r.status} />
         </div>
         <div className="space-y-2 rounded-xl border border-border bg-surface-1 p-4">
-          <h2 className="eyebrow">Corrected answer</h2>
+          <h2 className="text-sm font-semibold">Corrected answer</h2>
           {hasChanges(changes) ? (
             <HealDiff report={r} segments={changes} showCorrected />
           ) : (

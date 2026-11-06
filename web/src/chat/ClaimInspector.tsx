@@ -3,7 +3,7 @@ import { ExplainCard } from '@/claims/ExplainCard'
 import { ScoreRing } from '@/claims/ScoreRing'
 import { segmentAnswer } from '@/claims/segments'
 import { STATUS_META, uiStatus } from '@/claims/status'
-import StatusMark from '@/components/reactbits/StatusMark'
+import { LoaderCircle } from 'lucide-react'
 
 const rank: Record<Verdict, number> = { WRONG: 0, STALE: 1, UNVERIFIABLE: 2, FRESH: 3, NOT_CHECKED: 4 }
 
@@ -38,11 +38,11 @@ export function ClaimInspector({ report, selectedId, onSelect }: ClaimInspectorP
               onClick={() => onSelect(c.id)}
               disabled={unplaced.has(c.id)}
               aria-expanded={selected}
-              className="flex w-full items-start gap-3 p-3 text-left transition-colors duration-[var(--dur-hover)] focus-visible:outline-offset-[-4px] enabled:hover:bg-surface-2 aria-expanded:bg-accent-soft aria-expanded:shadow-[inset_2px_0_0_var(--accent)] disabled:cursor-default"
+              className="flex w-full items-start gap-3 p-3 text-left transition-colors duration-[var(--dur-hover)] focus-visible:outline-offset-[-4px] enabled:hover:bg-surface-2 aria-expanded:bg-accent-soft disabled:cursor-default"
             >
               {status === 'pending' ? (
                 <span aria-hidden="true" className="inline-flex size-7 shrink-0 items-center justify-center">
-                  <StatusMark status="running" size={28} color="var(--text-muted)" />
+                  <LoaderCircle className="size-4 animate-spin text-text-muted motion-reduce:animate-none" />
                 </span>
               ) : (
                 <ScoreRing score={c.score} size="sm" />

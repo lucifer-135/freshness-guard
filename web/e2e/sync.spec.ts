@@ -11,7 +11,7 @@ test('a sync answer arrives already corrected', async ({ page }) => {
   await page.getByRole('radio', { name: 'Correct' }).click()
   await ask(page)
   await expect(page.locator('ins').filter({ hasText: '$25' }).first()).toBeVisible({ timeout: 30_000 })
-  await expect(page.getByRole('radio', { name: 'Corrected' })).toHaveAttribute('aria-checked', 'true')
+  await expect(page.getByRole('radio', { name: 'Corrected' })).toBeChecked()
 })
 
 test('a blocked answer links to its report', async ({ page }) => {

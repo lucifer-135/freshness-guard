@@ -215,4 +215,4 @@ To reproduce the curated run, follow [bench/README.md](bench/README.md). The ove
 
 Models are used inside the product for claim extraction, judging and correcting, and Claude Code was used to build the project. [docs/AI_USAGE.md](docs/AI_USAGE.md) describes both, the safeguards, and what data leaves the machine.
 
-Freshness Guard is licensed under the Apache License 2.0, except for three components copied from React Bits in `web/src/components/reactbits/`, which are under MIT + Commons Clause (see [web/public/react-bits-license.md](web/public/react-bits-license.md)). See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+Freshness Guard is licensed under the Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).

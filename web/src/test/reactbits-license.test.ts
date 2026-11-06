@@ -1,24 +1,23 @@
 // @vitest-environment node
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { expect, test } from 'vitest'
 
-// React Bits is under MIT + Commons Clause, not Apache-2.0 like the rest of the
-// project, so every copied file must say so and the full licence must ship.
+// The developer chose on 7 November 2026 not to use React Bits in the new design.
+// Its MIT + Commons Clause licence also kept the web app from being purely Apache-2.0.
 const webRoot = path.resolve(import.meta.dirname, '../..')
-const dir = path.join(webRoot, 'src/components/reactbits')
+const repoRoot = path.resolve(webRoot, '..')
 
-test('every React Bits file carries its licence header', () => {
-  const files = readdirSync(dir).filter((f) => f.endsWith('.tsx'))
-  expect(files.length).toBeGreaterThan(0)
-  for (const file of files) {
-    const head = readFileSync(path.join(dir, file), 'utf8').slice(0, 600)
-    expect(head, file).toContain('MIT + Commons Clause')
-    expect(head, file).toContain('Copyright (c) 2026 David Haz')
-    expect(head, file).toContain('react-bits-license.md')
-  }
+test('no React Bits component is copied into the app', () => {
+  expect(existsSync(path.join(webRoot, 'src/components/reactbits'))).toBe(false)
+  const src = path.join(webRoot, 'src')
+  const files = readdirSync(src, { recursive: true, encoding: 'utf8' }).filter((f) => /\.(ts|tsx)$/.test(f) && !f.endsWith('reactbits-license.test.ts'))
+  const importers = files.filter((f) => /reactbits/i.test(readFileSync(path.join(src, f), 'utf8')))
+  expect(importers).toEqual([])
 })
 
-test('the full React Bits licence ships with the built app', () => {
-  expect(readFileSync(path.join(webRoot, 'public/react-bits-license.md'), 'utf8')).toContain('Commons Clause Restriction')
+test('no React Bits licence is shipped or listed', () => {
+  expect(existsSync(path.join(webRoot, 'public/react-bits-license.md'))).toBe(false)
+  expect(readFileSync(path.join(repoRoot, 'NOTICE'), 'utf8')).not.toMatch(/React Bits/)
+  expect(readFileSync(path.join(repoRoot, 'README.md'), 'utf8')).not.toMatch(/React Bits/)
 })

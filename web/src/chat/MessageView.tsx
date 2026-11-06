@@ -1,4 +1,4 @@
-import { CircleX } from 'lucide-react'
+import { CircleX, Info, LoaderCircle } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
@@ -11,7 +11,6 @@ import { ScoreRing } from '@/claims/ScoreRing'
 import { STATUS_META } from '@/claims/status'
 import { summaryChips } from '@/claims/summary'
 import { useStaggeredClaims } from '@/claims/useStaggeredClaims'
-import LatticeLoader from '@/components/reactbits/LatticeLoader'
 import { Segmented } from '@/components/Segmented'
 import { correctedView, hasChanges } from '@/heal/corrections'
 import { HealDiff } from '@/heal/HealDiff'
@@ -45,7 +44,12 @@ export function MessageView({ message, ...rest }: MessageViewProps) {
 }
 
 function Note({ children }: { children: string }) {
-  return <p className="rounded-md border border-border bg-surface-2 p-3 text-sm text-text-muted">{children}</p>
+  return (
+    <p className="flex items-start gap-2 text-sm text-text-muted">
+      <Info aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+      {children}
+    </p>
+  )
 }
 
 function AnswerView({
@@ -80,7 +84,8 @@ function AnswerView({
   const chips = report.data && staggered.reportStatus !== 'error' ? summaryChips(staggered.claims, staggered.reportStatus) : []
 
   return (
-    <article className="space-y-3 rounded-xl border border-border bg-surface-1 p-4 shadow-[var(--highlight-top)]">
+    // The answer is the artifact, so it sits on the page itself; turns are separated by space, not boxes.
+    <article aria-busy={staggered.reportStatus === 'pending' && report.data !== undefined} className="space-y-3 py-2">
       <header className="flex flex-wrap items-center gap-3">
         {report.data && <ScoreRing score={staggered.reportStatus === 'complete' ? report.data.score : null} />}
         <div className="min-w-48 flex-1">
@@ -90,14 +95,15 @@ function AnswerView({
             {name}
             {message.elapsedMs !== null && ` · Answered in ${(message.elapsedMs / 1000).toFixed(1)} s`}
           </p>
-          {sentence && staggered.reportStatus === 'pending' && (
-            // The loader is a short, one-line cue with a stopwatch; the sentence below says how far the check is.
-            // The page's live region announces that sentence, so the loader is hidden from screen readers.
-            <div aria-hidden="true" className="mt-1 text-text-muted">
-              <LatticeLoader label="Checking claims" color="var(--text-muted)" fontSize={13} />
-            </div>
+          {sentence && (
+            // The page's live region announces the sentence, so the spinner beside it is hidden from screen readers.
+            <p className="flex items-center gap-2 text-sm text-text-muted">
+              {staggered.reportStatus === 'pending' && (
+                <LoaderCircle data-spinner aria-hidden="true" className="size-3.5 shrink-0 animate-spin motion-reduce:animate-none" />
+              )}
+              {sentence}
+            </p>
           )}
-          {sentence && <p className="text-sm text-text-muted">{sentence}</p>}
           {staggered.reportStatus === 'error' && (
             <p className="mt-1 flex items-center gap-1.5 text-sm text-text">
               <CircleX aria-hidden="true" className="size-4 text-status-outdated" />
@@ -118,15 +124,11 @@ function AnswerView({
         )}
       </header>
       {chips.length > 0 && (
-        <ul aria-label="Verdict summary" className="flex flex-wrap gap-2">
+        <ul aria-label="Verdict summary" className="flex flex-wrap gap-x-4 gap-y-1">
           {chips.map(({ status, label }) => {
             const Icon = STATUS_META[status].icon
             return (
-              <li
-                key={status}
-                className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs"
-                style={{ borderColor: `color-mix(in oklab, ${statusColour(status)} 50%, transparent)` }}
-              >
+              <li key={status} className="inline-flex items-center gap-1.5 text-sm text-text-muted">
                 <Icon aria-hidden="true" className="size-3.5" style={{ color: statusColour(status) }} />
                 {label}
               </li>

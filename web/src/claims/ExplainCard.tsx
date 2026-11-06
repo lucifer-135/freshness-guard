@@ -52,7 +52,7 @@ function Excerpt({ text }: { text: string }) {
 }
 
 function Eyebrow({ children }: { children: string }) {
-  return <h3 className="eyebrow mt-4 mb-2">{children}</h3>
+  return <h3 className="mt-4 mb-1 text-sm font-semibold text-text">{children}</h3>
 }
 
 // ExplainCard is the content of a claim's explain card (DESIGN.md section 7.1).

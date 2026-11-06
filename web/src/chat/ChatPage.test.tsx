@@ -127,7 +127,7 @@ describe('ChatPage', () => {
     await send()
     expect(chatBody(fake)).toMatchObject({ mode: 'sync', policy: 'heal', stream: false })
     const version = await screen.findByRole('radiogroup', { name: 'Answer version' })
-    expect(within(version).getByRole('radio', { name: 'Corrected' })).toHaveAttribute('aria-checked', 'true')
+    expect(within(version).getByRole('radio', { name: 'Corrected' })).toBeChecked()
     expect((await screen.findAllByText('$25', { selector: 'ins' })).length).toBeGreaterThan(0)
     await userEvent.click(within(version).getByRole('radio', { name: 'Original' }))
     expect(document.querySelectorAll('ins')).toHaveLength(0)
@@ -149,12 +149,12 @@ describe('ChatPage', () => {
     expect(screen.queryByText(/^\d+ (incorrect|outdated|could not be verified|current|not checked|being checked)$/)).toBeNull()
   })
 
-  it('shows a short loader label next to the longer progress sentence while claims are checked', async () => {
+  it('marks the answer as busy and says how far the check is while claims are checked', async () => {
     fake = setup(streamedAnswer, completeReport({ status: 'pending' }))
     await send()
-    // The loader keeps to one line; the sentence says how far the check is.
-    expect(await screen.findByText('Checking claims', {}, { timeout: 3000 })).toBeInTheDocument()
-    expect(screen.getAllByText(/^Checking claims against live sources\./).length).toBeGreaterThan(0)
+    await screen.findAllByText(/^Checking claims against live sources\./, {}, { timeout: 3000 })
+    expect(screen.getByRole('article')).toHaveAttribute('aria-busy', 'true')
+    expect(screen.getByRole('article').querySelector('[data-spinner]')).not.toBeNull()
   })
 
   it('ends the checking loader with an error when the check fails', async () => {
@@ -163,7 +163,8 @@ describe('ChatPage', () => {
     expect((await screen.findAllByText('The claims could not be checked.', {}, { timeout: 3000 })).length).toBeGreaterThan(0)
     // A failed check has no verdicts to count, and the working loader is gone.
     expect(screen.queryByRole('list', { name: 'Verdict summary' })).toBeNull()
-    expect(screen.queryByText('Checking claims')).toBeNull()
+    expect(screen.getByRole('article')).toHaveAttribute('aria-busy', 'false')
+    expect(screen.getByRole('article').querySelector('[data-spinner]')).toBeNull()
     // The long sentence is shown once as text; the one-line loader never carries it, so it cannot overflow a narrow screen.
     const sentence = 'The freshness check could not finish. The judge model did not respond.'
     for (const el of screen.getAllByText(sentence)) expect(el.closest('[aria-hidden="true"]')).toBeNull()
@@ -311,6 +312,19 @@ describe('ChatPage', () => {
     const inspector = screen.getByRole('complementary', { name: 'Claims in this answer' })
     expect(within(inspector).getByRole('list')).toHaveClass('divide-y')
     for (const row of within(inspector).getAllByRole('button')) expect(row).not.toHaveClass('bg-surface-2')
+  })
+
+  it('sets the answer on the page, not in a card, with a plain verdict summary', async () => {
+    fake = setup(streamedAnswer, completeReport())
+    await send()
+    await screen.findByText('2 claims checked. 1 claim is outdated.', {}, { timeout: 3000 })
+    const answer = screen.getByRole('article')
+    expect(answer).not.toHaveClass('rounded-xl')
+    expect(answer).not.toHaveClass('border')
+    for (const item of within(screen.getByRole('list', { name: 'Verdict summary' })).getAllByRole('listitem')) {
+      expect(item).not.toHaveClass('rounded-full')
+      expect(item).not.toHaveClass('border')
+    }
   })
 
   it('centres the conversation and the inspector on wide screens', async () => {

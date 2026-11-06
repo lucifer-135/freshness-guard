@@ -21,6 +21,7 @@
   --accent: #60A5FA;
   --accent-strong: #93C5FD;
   --accent-soft: #60A5FA1F;
+  --accent-soft-strong: #60A5FA4D;
 
   --status-current: #34D399;
   --status-unverified: #FBBF24;
@@ -118,6 +119,14 @@
        below 768px) and of the docked chat composer, whose height ChatPage sets. */
     scroll-padding-top: 7rem;
     scroll-padding-bottom: var(--composer-inset, 0px);
+    caret-color: var(--accent);
+    scrollbar-color: var(--border-strong) transparent;
+  }
+
+  /* The parts the browser draws carry the palette too. */
+  ::selection {
+    background: var(--accent-soft-strong);
+    color: var(--text);
   }
 
   body {
@@ -150,14 +159,6 @@
 }
 
 @layer components {
-  .eyebrow {
-    font-family: var(--font-mono);
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-subtle);
-  }
-
   /* Claim underlines (DESIGN.md section 3.3): colour is never the only signal. */
   .claim-current,
   .claim-unverified,
