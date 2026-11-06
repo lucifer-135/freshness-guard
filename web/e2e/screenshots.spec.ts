@@ -4,7 +4,10 @@ import { ask, pickModel, signIn } from './helpers'
 // Takes the README screenshots against the real stack (real models, real
 // search). It runs only in the "screenshots" project: npx playwright test
 // --project=screenshots. The images are written to web/docs-images/.
-const question = 'What is the latest stable version of Python, and how much does ChatGPT Plus cost per month? Answer in two plain sentences, without any formatting.'
+// Both prices changed in 2026 (bench/curated.json), so a model with an older
+// knowledge cutoff is likely to give at least one outdated value.
+const question =
+  'How much does Apple TV cost per month in the United States, and how much does Xbox Game Pass Ultimate cost per month? Answer in two plain sentences, without any formatting.'
 
 // Lets entrance animations finish, so the image does not show a half-faded card.
 async function settle(page: Page) {

@@ -65,19 +65,91 @@ You need Docker (Docker Desktop on Windows) and Git Bash on Windows. Go is not n
    - `TAVILY_API_KEY`: a Tavily key. The free plan is enough to try the plugin.
    - `FG_API_TOKEN`: any long random string. It protects the plugin API and is the sign-in token of the web app. With an empty token the protected routes answer 503.
    - `BIFROST_SETUP_TOKEN`: any long random string. Bifrost reads it too. The plugin uses it to remove outdated answers from the semantic cache.
-3. Start Bifrost with the plugin: `docker compose -f deploy/docker-compose.yml up -d --build bifrost`.
-4. Open http://localhost:8090/freshness/ui/ and sign in with `FG_API_TOKEN`. The gateway is at http://localhost:8080. The health check is http://localhost:8090/freshness/health.
+3. Start Bifrost with the plugin (the commands are below).
+4. Open http://localhost:8090/freshness/ui/. The home page explains the product; enter `FG_API_TOKEN` there and choose **Open the chat**. The gateway is at http://localhost:8080.
 
 On Windows, set `MSYS_NO_PATHCONV=1` in Git Bash before `docker compose run` commands that pass paths such as `/src/...`.
 
-To run the tests, which also build in Docker:
+### Run and stop
+
+Run every command from the repository root.
+
+Build the image and start Bifrost with the plugin in the background. `--build` rebuilds after a code change; without it Docker reuses the old image:
+
+```bash
+docker compose -f deploy/docker-compose.yml up -d --build bifrost
+```
+
+Check that the plugin API is up. It answers `{"status":"ok","plugin":"freshness-guard"}`:
+
+```bash
+curl http://localhost:8090/freshness/health
+```
+
+Follow the gateway and plugin log. Press Ctrl+C to stop following; the stack keeps running:
+
+```bash
+docker compose -f deploy/docker-compose.yml logs -f bifrost
+```
+
+Restart after editing `deploy/config.json`. Bifrost copies it into its config store at startup:
+
+```bash
+docker compose -f deploy/docker-compose.yml restart bifrost
+```
+
+After editing `deploy/.env`, recreate the container instead, because a restart keeps the old environment:
+
+```bash
+docker compose -f deploy/docker-compose.yml up -d bifrost
+```
+
+Stop and remove the containers. Reports, the verdict cache and dashboard settings are kept in the `freshness-guard_bifrost-data` volume:
+
+```bash
+docker compose -f deploy/docker-compose.yml down
+```
+
+Stop and also delete all stored data, for a clean start:
+
+```bash
+docker compose -f deploy/docker-compose.yml down && docker volume rm freshness-guard_bifrost-data
+```
+
+### Tests
+
+Run the Go unit tests:
 
 ```bash
 docker compose -f deploy/docker-compose.yml run --rm gotest
+```
+
+Start the end-to-end stack, which uses a fake model provider and a fake Tavily, so it spends no credits. Its plugin API listens on port 8091 inside the Docker network:
+
+```bash
 docker compose -f deploy/docker-compose.yml --profile tools up -d --build bifrost-e2e
+```
+
+With that stack running, run the Go end-to-end tests, then the browser tests with the accessibility scan:
+
+```bash
 docker compose -f deploy/docker-compose.yml run --rm e2e
+```
+
+```bash
 docker compose -f deploy/docker-compose.yml run --rm webtest
+```
+
+Run the web unit tests on the host (Node 24):
+
+```bash
 npm --prefix web test
+```
+
+Start the web app with hot reload against the running stack, at http://localhost:5173/freshness/ui/:
+
+```bash
+FG_API_URL=http://localhost:8090 npm --prefix web run dev
 ```
 
 ## Using it
@@ -104,7 +176,7 @@ Plugin API, on port 8090 under `/freshness`. Every route except `/freshness/heal
 | `GET /health` | Health check. |
 | `/mcp` | The MCP tool, below. |
 
-The web app has three parts. Chat sends a question to a model of your choice and underlines each claim as its verdict arrives. A claim opens an explanation with the evidence and the judge's reasoning, and a switch shows the corrected answer. Check any answer takes pasted text. The dashboard shows how often each model gives outdated or incorrect claims, by category, with a live feed of checks.
+Before sign-in, a home page shows a checked answer, how the plugin works and what was measured, with the sign-in form. After sign-in, the web app has three parts. Chat sends a question to a model of your choice and underlines each claim as its verdict arrives. A claim opens an explanation with the evidence and the judge's reasoning, and a switch shows the corrected answer. Check any answer takes pasted text. The dashboard shows how often each model gives outdated or incorrect claims, by category, with a live feed of checks.
 
 ![The corrected answer](docs/images/corrected.png)
 
