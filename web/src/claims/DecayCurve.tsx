@@ -62,7 +62,7 @@ export function DecayCurve({ model, today }: { model: DecayModel; today: Date })
         onPointerMove={onPointerMove}
         onPointerLeave={onPointerLeave}
       >
-        <polyline points={points.join(' ')} fill="none" stroke="var(--accent)" strokeWidth="2" />
+        <polyline points={points.join(' ')} fill="none" stroke="var(--text-muted)" strokeWidth="2" />
         <line x1={x(today.getTime())} x2={x(today.getTime())} y1={PAD} y2={HEIGHT - PAD} stroke="var(--border-strong)" strokeDasharray="3 3" />
         <text x={x(today.getTime()) + 4} y={PAD + 10} fill="var(--text-subtle)" fontSize="10">
           Today

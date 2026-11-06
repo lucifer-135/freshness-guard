@@ -70,16 +70,19 @@ describe('AppShell', () => {
   it('shows gateway status, credits and the live connection', async () => {
     fake = fakeFetch({ 'GET /freshness/status': () => status(true, 9), 'GET /freshness/events': endedStream })
     renderAt('/chat')
-    expect(await screen.findByText('Connected to Bifrost, 9 models available.')).toBeInTheDocument()
-    expect(screen.getByText('Tavily credits today: 12 of 200')).toBeInTheDocument()
+    // A healthy gateway is said to screen readers only; the top bar keeps to one row at 1440px.
+    expect(await screen.findByText('Connected to Bifrost, 9 models available.')).toHaveClass('sr-only')
     expect(screen.getByRole('img', { name: 'Tavily credits today: 12 of 200' })).toBeInTheDocument()
+    // Only the figure is mono, and the meter fill is neutral: blue is reserved for focus, links and selection.
+    expect(screen.getByText('12 of 200')).toHaveClass('font-mono')
+    expect(screen.getByRole('img', { name: 'Tavily credits today: 12 of 200' }).innerHTML).not.toContain('--accent')
     expect(await screen.findByText('Reconnecting')).toBeInTheDocument()
   })
 
   it('says when Bifrost cannot be reached', async () => {
     fake = fakeFetch({ 'GET /freshness/status': () => status(false, 0), 'GET /freshness/events': endedStream })
     renderAt('/chat')
-    expect(await screen.findByText('Bifrost could not be reached.')).toBeInTheDocument()
+    expect(await screen.findByText('Bifrost could not be reached.')).not.toHaveClass('sr-only')
   })
 
   it('signs out', async () => {

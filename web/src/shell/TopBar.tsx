@@ -29,6 +29,8 @@ export function TopBar() {
   } else if (status.isError) {
     gateway = 'The plugin status could not be loaded.'
   }
+  // A healthy gateway needs no words on screen, so the bar stays on one row; a problem is always shown.
+  const healthy = status.data?.gateway.reachable === true || (!status.data && !status.isError)
 
   return (
     <header className="sticky top-0 z-10 border-b border-border bg-surface-1 px-4 lg:px-6">
@@ -39,7 +41,7 @@ export function TopBar() {
       </p>
       <NavRail className="order-last w-full md:order-none md:w-auto" />
       <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1 py-2">
-        <p className="sr-only text-sm text-text-muted md:not-sr-only">{gateway}</p>
+        <p className={healthy ? 'sr-only' : 'text-sm text-status-unverified'}>{gateway}</p>
         {status.data && <CreditMeter used={status.data.credits.used} budget={status.data.credits.budget} />}
         <p
           className="flex items-center gap-1.5 text-sm text-text-muted"

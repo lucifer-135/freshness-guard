@@ -99,7 +99,7 @@ function Conversation() {
   return (
     // DESIGN.md 7.1: the conversation and the inspector sit in the centre of wide screens.
     <div className="flex gap-6">
-      <div className="min-w-0 flex-1 space-y-4 xl:max-w-[760px]">
+      <div className="min-w-0 flex-1 space-y-4">
         <div aria-live="polite" className="sr-only">
           {announcement}
         </div>

@@ -60,7 +60,7 @@ export function CheckPanel() {
 
   return (
     <div className="flex gap-6">
-      <div className="min-w-0 flex-1 space-y-4 xl:max-w-[760px]">
+      <div className="min-w-0 flex-1 space-y-4">
         <form onSubmit={submit} className="space-y-3">
           <Label htmlFor={fieldId}>Answer to check</Label>
           <Textarea

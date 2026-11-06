@@ -26,7 +26,7 @@ function Meter({ labelledBy, used, budget }: { labelledBy: string; used: number;
     >
       <div
         className="h-full rounded-full"
-        style={{ width: `${share * 100}%`, backgroundColor: share >= 0.9 ? 'var(--status-unverified)' : 'var(--accent)' }}
+        style={{ width: `${share * 100}%`, backgroundColor: share >= 0.9 ? 'var(--status-unverified)' : 'var(--text-muted)' }}
       />
     </div>
   )

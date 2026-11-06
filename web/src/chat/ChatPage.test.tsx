@@ -350,7 +350,9 @@ describe('ChatPage', () => {
     const layout = screen.getByRole('complementary', { name: 'Claims in this answer' }).parentElement
     // 760px conversation, 24px gap and 360px inspector, aligned to the shell frame's left edge.
     expect(layout).not.toHaveClass('max-w-[1144px]')
-    expect(layout?.firstElementChild).toHaveClass('xl:max-w-[760px]')
+    // The conversation fills the frame beside the 360px inspector, so the right edge matches every other page.
+    expect(layout?.firstElementChild).toHaveClass('flex-1')
+    expect(layout?.firstElementChild).not.toHaveClass('xl:max-w-[760px]')
   })
 
   it('keeps the inspector row focus ring inside the clipped list and marks hover and selection visibly', async () => {
