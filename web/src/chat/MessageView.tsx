@@ -81,7 +81,7 @@ function AnswerView({
     <article className="space-y-3 rounded-xl border border-border bg-surface-1 p-4 shadow-[var(--highlight-top)]">
       <header className="flex flex-wrap items-center gap-3">
         {report.data && <ScoreRing score={staggered.reportStatus === 'complete' ? report.data.score : null} />}
-        <div className="min-w-0 flex-1">
+        <div className="min-w-48 flex-1">
           {report.data && staggered.reportStatus === 'complete' && <p className="font-medium">Freshness {report.data.score} of 100</p>}
           <p className="font-mono text-xs text-text-subtle">
             {provider && `${provider} / `}
@@ -89,12 +89,13 @@ function AnswerView({
             {message.elapsedMs !== null && ` · Answered in ${(message.elapsedMs / 1000).toFixed(1)} s`}
           </p>
           {sentence && staggered.reportStatus === 'pending' && (
-            // The page's live region announces the same sentence, so the loader is hidden from screen readers.
+            // The loader is a short, one-line cue with a stopwatch; the sentence below says how far the check is.
+            // The page's live region announces that sentence, so the loader is hidden from screen readers.
             <div aria-hidden="true" className="mt-1 text-text-muted">
-              <LatticeLoader label={sentence} color="var(--text-muted)" fontSize={13} />
+              <LatticeLoader label="Checking claims" color="var(--text-muted)" fontSize={13} />
             </div>
           )}
-          {sentence && staggered.reportStatus !== 'pending' && <p className="text-sm text-text-muted">{sentence}</p>}
+          {sentence && <p className="text-sm text-text-muted">{sentence}</p>}
           {staggered.reportStatus === 'error' && (
             <div aria-hidden="true" className="mt-1 text-text-muted">
               <LatticeLoader status="error" label={sentence ?? ''} errorLabel="The claims could not be checked." showTimer={false} color="var(--text-muted)" fontSize={13} />

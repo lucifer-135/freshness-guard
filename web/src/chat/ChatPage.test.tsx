@@ -141,6 +141,14 @@ describe('ChatPage', () => {
     expect(screen.queryByText(/^\d+ (incorrect|outdated|could not be verified|current|not checked|being checked)$/)).toBeNull()
   })
 
+  it('shows a short loader label next to the longer progress sentence while claims are checked', async () => {
+    fake = setup(streamedAnswer, completeReport({ status: 'pending' }))
+    await send()
+    // The loader keeps to one line; the sentence says how far the check is.
+    expect(await screen.findByText('Checking claims', {}, { timeout: 3000 })).toBeInTheDocument()
+    expect(screen.getAllByText(/^Checking claims against live sources\./).length).toBeGreaterThan(0)
+  })
+
   it('ends the checking loader with an error when the check fails', async () => {
     fake = setup(streamedAnswer, completeReport({ status: 'error', reason: 'The judge model did not respond.' }))
     await send()
