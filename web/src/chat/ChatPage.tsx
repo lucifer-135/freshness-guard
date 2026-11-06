@@ -7,27 +7,26 @@ import { useChat } from './ChatProvider'
 import type { AssistantMessage } from './useChat'
 import { CheckPanel } from '@/check/CheckPanel'
 import { Button } from '@/components/ui/button'
+import GradualBlur from '@/components/reactbits/GradualBlur'
+import { Segmented } from '@/components/Segmented'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useReport } from '@/live/useReport'
 import { useStatus } from '@/shell/TopBar'
 
+type Section = 'chat' | 'check'
+
+const sections: { value: Section; label: string }[] = [
+  { value: 'chat', label: 'Chat' },
+  { value: 'check', label: 'Check any answer' },
+]
+
 export function ChatPage() {
+  const [section, setSection] = useState<Section>('chat')
   return (
     <section className="space-y-4">
-      <h1 className="text-2xl font-semibold">Freshness-checked chat</h1>
-      <Tabs defaultValue="chat">
-        <TabsList>
-          <TabsTrigger value="chat">Chat</TabsTrigger>
-          <TabsTrigger value="check">Check any answer</TabsTrigger>
-        </TabsList>
-        <TabsContent value="chat">
-          <Conversation />
-        </TabsContent>
-        <TabsContent value="check">
-          <CheckPanel />
-        </TabsContent>
-      </Tabs>
+      <h1 className="sr-only">Freshness-checked chat</h1>
+      <Segmented label="Page section" value={section} options={sections} onChange={setSection} />
+      {section === 'chat' ? <Conversation /> : <CheckPanel />}
     </section>
   )
 }
@@ -109,7 +108,12 @@ function Conversation() {
             </Sheet>
           </div>
         )}
-        <Composer busy={busy} onSend={send} />
+        <div className="sticky bottom-0 z-10 bg-bg pt-2 pb-4">
+          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-full h-8">
+            <GradualBlur position="bottom" target="parent" height="2rem" strength={1.5} />
+          </div>
+          <Composer busy={busy} onSend={send} />
+        </div>
       </div>
       {inspector && (
         <aside aria-label="Claims in this answer" className="hidden w-[360px] shrink-0 space-y-3 xl:block">

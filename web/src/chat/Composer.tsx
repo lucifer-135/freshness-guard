@@ -1,28 +1,17 @@
 import { useQuery } from '@tanstack/react-query'
-import { Send } from 'lucide-react'
+import { ArrowUp } from 'lucide-react'
 import { useId, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { modeHint, modeOptions, policyOptions } from './modes'
 import { ModelPicker } from './ModelPicker'
 import { getModels } from '@/api/client'
 import type { Mode, Policy } from '@/api/types'
-import { Label } from '@/components/ui/label'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Segmented } from '@/components/Segmented'
+import { Textarea } from '@/components/ui/textarea'
 import { useStatus } from '@/shell/TopBar'
 
 const MODEL_KEY = 'fg.model'
-
-const modes: { value: Mode; label: string }[] = [
-  { value: 'async', label: 'In the background (async)' },
-  { value: 'sync', label: 'Before the answer is returned (sync)' },
-  { value: 'off', label: 'Off' },
-]
-
-const policies: { value: Policy; label: string }[] = [
-  { value: 'annotate', label: 'Show warnings only' },
-  { value: 'heal', label: 'Correct the answer' },
-  { value: 'block', label: 'Block the answer' },
-]
 
 function storedModel(): string | null {
   try {
@@ -30,35 +19,6 @@ function storedModel(): string | null {
   } catch {
     return null
   }
-}
-
-function Choice<T extends string>({
-  legend,
-  value,
-  options,
-  onChange,
-}: {
-  legend: string
-  value: T
-  options: { value: T; label: string }[]
-  onChange: (v: T) => void
-}) {
-  const id = useId()
-  return (
-    <fieldset className="space-y-2">
-      <legend className="eyebrow">{legend}</legend>
-      <RadioGroup value={value} onValueChange={(v) => onChange(v as T)} className="flex flex-wrap gap-x-4 gap-y-2">
-        {options.map((o) => (
-          <div key={o.value} className="flex items-center gap-2">
-            <RadioGroupItem value={o.value} id={`${id}-${o.value}`} />
-            <Label htmlFor={`${id}-${o.value}`} className="font-normal">
-              {o.label}
-            </Label>
-          </div>
-        ))}
-      </RadioGroup>
-    </fieldset>
-  )
 }
 
 export interface ComposerProps {
@@ -105,32 +65,38 @@ export function Composer({ busy, onSend }: ComposerProps) {
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4 rounded-xl border border-border bg-surface-1 p-4">
-      <div className="flex flex-wrap gap-6">
-        <div className="space-y-2">
-          <Label htmlFor={`${messageId}-model`} className="eyebrow">
-            Model
-          </Label>
-          <ModelPicker
-            id={`${messageId}-model`}
-            models={list}
-            value={model}
-            onChange={chooseModel}
-            disabled={list.length === 0}
-            placeholder={models.isError ? 'The models could not be loaded.' : 'Loading models'}
-          />
-        </div>
-        <Choice legend="Verification mode" value={mode} options={modes} onChange={setMode} />
-        {mode === 'sync' && <Choice legend="When a claim is outdated" value={policy} options={policies} onChange={setPolicy} />}
+    <form onSubmit={submit} className="space-y-2 rounded-xl border border-border-strong bg-surface-2 p-3">
+      <Label htmlFor={messageId} className="sr-only">
+        Message
+      </Label>
+      <Textarea
+        id={messageId}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={onKeyDown}
+        rows={2}
+        placeholder="Ask about something that changes over time"
+      />
+      <div className="flex flex-wrap items-center gap-2">
+        <Label htmlFor={`${messageId}-model`} className="sr-only">
+          Model
+        </Label>
+        <ModelPicker
+          id={`${messageId}-model`}
+          models={list}
+          value={model}
+          onChange={chooseModel}
+          disabled={list.length === 0}
+          placeholder={models.isError ? 'The models could not be loaded.' : 'Loading models'}
+        />
+        <Segmented label="Verification mode" value={mode} options={modeOptions} onChange={setMode} />
+        {mode === 'sync' && <Segmented label="When a claim is outdated" value={policy} options={policyOptions} onChange={setPolicy} />}
+        <Button type="submit" className="ml-auto h-9" disabled={!canSend}>
+          <ArrowUp aria-hidden="true" />
+          Send
+        </Button>
       </div>
-      <div className="space-y-2">
-        <Label htmlFor={messageId}>Message</Label>
-        <Textarea id={messageId} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={onKeyDown} rows={3} />
-      </div>
-      <Button type="submit" className="h-10" disabled={!canSend}>
-        <Send aria-hidden="true" />
-        Send
-      </Button>
+      <p className="text-xs text-text-muted">{modeHint(mode, settings?.sync_timeout_ms ?? 8000)}</p>
     </form>
   )
 }

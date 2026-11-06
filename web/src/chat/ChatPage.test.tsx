@@ -77,9 +77,25 @@ describe('ChatPage', () => {
   it('shows the policy choices only for sync checks', async () => {
     fake = setup(streamedAnswer)
     await screen.findByLabelText('Message')
-    expect(screen.queryByRole('radio', { name: 'Correct the answer' })).toBeNull()
-    await userEvent.click(screen.getByRole('radio', { name: 'Before the answer is returned (sync)' }))
-    expect(screen.getByRole('radio', { name: 'Correct the answer' })).toBeChecked()
+    expect(screen.queryByRole('radio', { name: 'Correct' })).toBeNull()
+    await userEvent.click(screen.getByRole('radio', { name: 'Before reply' }))
+    expect(screen.getByRole('radio', { name: 'Correct' })).toBeChecked()
+  })
+
+  it('explains the chosen verification mode under the composer', async () => {
+    fake = setup(streamedAnswer)
+    await screen.findByLabelText('Message')
+    expect(screen.getByText('Claims are checked after the answer is shown.')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('radio', { name: 'Before reply' }))
+    expect(screen.getByText('The answer waits up to 8 seconds while its claims are checked.')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('radio', { name: 'Off' }))
+    expect(screen.getByText('This answer will not be checked.')).toBeInTheDocument()
+  })
+
+  it('keeps the page heading for screen readers only', async () => {
+    fake = setup(streamedAnswer)
+    await screen.findByLabelText('Message')
+    expect(screen.getByRole('heading', { level: 1, name: 'Freshness-checked chat' })).toHaveClass('sr-only')
   })
 
   it('shows a corrected sync answer', async () => {
@@ -89,7 +105,7 @@ describe('ChatPage', () => {
       completeReport({ mode: 'sync', policy: 'heal', healed_text: healed, healed_count: 1 }),
     )
     await screen.findByLabelText('Message')
-    await userEvent.click(screen.getByRole('radio', { name: 'Before the answer is returned (sync)' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'Before reply' }))
     await send()
     expect(chatBody(fake)).toMatchObject({ mode: 'sync', policy: 'heal', stream: false })
     expect(await screen.findByRole('switch', { name: 'Show corrected answer' })).toBeChecked()
@@ -106,8 +122,8 @@ describe('ChatPage', () => {
       }),
     )
     await screen.findByLabelText('Message')
-    await userEvent.click(screen.getByRole('radio', { name: 'Before the answer is returned (sync)' }))
-    await userEvent.click(screen.getByRole('radio', { name: 'Block the answer' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'Before reply' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'Block' }))
     await send()
     expect(await screen.findByText('The answer was blocked because it contains outdated or incorrect claims.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Open the full report' })).toHaveAttribute('href', '/freshness/ui/reports/abc-123')
@@ -118,7 +134,7 @@ describe('ChatPage', () => {
   it('explains a sync check that took too long', async () => {
     fake = setup(syncAnswer(answer, { 'X-Freshness-Report-Id': 'r1', 'X-Freshness-Status': 'pending' }), completeReport({ status: 'pending' }))
     await screen.findByLabelText('Message')
-    await userEvent.click(screen.getByRole('radio', { name: 'Before the answer is returned (sync)' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'Before reply' }))
     await send()
     expect(
       await screen.findByText(
@@ -130,7 +146,7 @@ describe('ChatPage', () => {
   it('explains a skipped check and a failed request', async () => {
     fake = setup(syncAnswer(answer, { 'X-Freshness-Status': 'skipped' }))
     await screen.findByLabelText('Message')
-    await userEvent.click(screen.getByRole('radio', { name: 'Before the answer is returned (sync)' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'Before reply' }))
     await send()
     expect(
       await screen.findByText(
@@ -161,8 +177,8 @@ describe('ChatPage', () => {
     fake = setup(streamedAnswer, completeReport())
     await send()
     await screen.findByText('2 claims checked. 1 claim is outdated.', {}, { timeout: 3000 })
-    await userEvent.click(screen.getByRole('tab', { name: 'Check any answer' }))
-    await userEvent.click(screen.getByRole('tab', { name: 'Chat' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'Check any answer' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'Chat' }))
     expect(screen.getByText('What does it cost?')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('link', { name: 'Reports' }))
     await userEvent.click(screen.getByRole('link', { name: 'Chat' }))
