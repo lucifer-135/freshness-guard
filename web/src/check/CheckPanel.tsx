@@ -115,7 +115,7 @@ export function CheckPanel() {
       {data && data.claims.length > 0 && (
         <aside aria-label="Claims in the checked text" className="hidden w-[360px] shrink-0 space-y-3 xl:block">
           <h2 className="eyebrow">Claims in the checked text</h2>
-          <ClaimInspector report={data} onSelect={setOpenClaim} />
+          <ClaimInspector report={data} selectedId={null} onSelect={setOpenClaim} />
         </aside>
       )}
     </div>

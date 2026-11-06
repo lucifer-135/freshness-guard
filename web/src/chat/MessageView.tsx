@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { splitModel } from './models'
 import type { AssistantMessage, Message } from './useChat'
+import { ClaimPreview } from '@/claims/ClaimPreview'
 import { ClaimText } from '@/claims/ClaimText'
 import { progressSentence } from '@/claims/progress'
 import { ScoreRing } from '@/claims/ScoreRing'
@@ -30,6 +31,8 @@ interface MessageViewProps {
   syncTimeoutMs: number
   openClaimId?: string | null
   onOpenChange?: (id: string | null) => void
+  // Opens a claim's full details in the claim inspector.
+  onShowDetails?: (id: string) => void
   onStatus?: (sentence: string) => void
 }
 
@@ -44,7 +47,14 @@ function Note({ children }: { children: string }) {
   return <p className="rounded-md border border-border bg-surface-2 p-3 text-sm text-text-muted">{children}</p>
 }
 
-function AnswerView({ message, syncTimeoutMs, openClaimId, onOpenChange, onStatus }: MessageViewProps & { message: AssistantMessage }) {
+function AnswerView({
+  message,
+  syncTimeoutMs,
+  openClaimId,
+  onOpenChange,
+  onShowDetails,
+  onStatus,
+}: MessageViewProps & { message: AssistantMessage }) {
   const checked = message.mode !== 'off' && message.phase === 'done' && message.reportId !== null
   const report = useReport(message.reportId, { enabled: checked })
   const staggered = useStaggeredClaims(report.data?.claims ?? [], report.data?.status ?? 'pending')
@@ -166,6 +176,16 @@ function AnswerView({ message, syncTimeoutMs, openClaimId, onOpenChange, onStatu
                   report={report.data}
                   openClaimId={openClaimId}
                   onOpenChange={onOpenChange}
+                  renderCard={(claim, claimReport, close) => (
+                    <ClaimPreview
+                      claim={claim}
+                      report={claimReport}
+                      onShowDetails={() => {
+                        close()
+                        onShowDetails?.(claim.id)
+                      }}
+                    />
+                  )}
                 />
               )
             ) : (

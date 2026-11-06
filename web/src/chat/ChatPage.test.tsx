@@ -56,13 +56,23 @@ function chatBody(fake: FakeFetch): Record<string, unknown> {
   return JSON.parse(req?.body ?? '{}') as Record<string, unknown>
 }
 
+// The claim inspector sits beside the chat from 1280px; below that it is a sheet.
+const realMatchMedia = window.matchMedia
+function setScreenWide(wide: boolean) {
+  window.matchMedia = (query: string) =>
+    ({ ...realMatchMedia(query), matches: wide && query.includes('min-width: 1280px') }) as MediaQueryList
+}
+
 describe('ChatPage', () => {
   let fake: FakeFetch
   beforeEach(() => {
     clearToken()
     setToken('t1')
   })
-  afterEach(() => fake?.restore())
+  afterEach(() => {
+    fake?.restore()
+    window.matchMedia = realMatchMedia
+  })
 
   it('streams an async answer and underlines its claims', async () => {
     fake = setup(streamedAnswer, completeReport())
@@ -244,18 +254,19 @@ describe('ChatPage', () => {
     expect(articles[articles.length - 1]).toContainElement(scrolled[0] as HTMLElement)
   })
 
-  it('closes the claims sheet on narrow screens and opens the chosen claim', async () => {
+  it('expands the chosen claim inside the claims sheet on narrow screens', async () => {
     fake = setup(streamedAnswer, completeReport())
     await send()
     await screen.findByText('2 claims checked. 1 claim is outdated.', {}, { timeout: 3000 })
     await userEvent.click(screen.getByRole('button', { name: 'Claims' }))
     const sheet = await screen.findByRole('dialog', { name: 'Claims in this answer' })
     await userEvent.click(within(sheet).getAllByRole('button', { name: /Example Cloud Pro costs/ })[0])
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Claims in this answer' })).toBeNull())
-    expect(await screen.findByRole('dialog')).toHaveTextContent('Current value: $25 per month')
+    expect(within(sheet).getByText('Current value: $25 per month')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Claims in this answer' })).toBeInTheDocument()
   })
 
-  it('lists claims by risk and opens a claim from the inspector', async () => {
+  it('lists claims by risk and expands a claim in the inspector', async () => {
+    setScreenWide(true)
     fake = setup(streamedAnswer, completeReport())
     await send()
     // Wait until every staggered verdict is shown.
@@ -263,8 +274,48 @@ describe('ChatPage', () => {
     const inspector = await screen.findByRole('complementary', { name: 'Claims in this answer' })
     const rows = await within(inspector).findAllByRole('button', {}, { timeout: 3000 })
     expect(rows[0]).toHaveTextContent('Example Cloud Pro costs $20 per month')
+    expect(rows[0]).toHaveTextContent('$20 per month → $25 per month')
     expect(rows[1]).toHaveTextContent('its current version is 4.2')
     await userEvent.click(rows[0])
-    expect(await screen.findByRole('dialog')).toHaveTextContent('Current value: $25 per month')
+    expect(rows[0]).toHaveAttribute('aria-expanded', 'true')
+    expect(within(inspector).getByText('Current value: $25 per month')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('shows a short preview when a claim is hovered', async () => {
+    fake = setup(streamedAnswer, completeReport())
+    await send()
+    await screen.findByText('2 claims checked. 1 claim is outdated.', {}, { timeout: 3000 })
+    await userEvent.hover(screen.getByRole('button', { name: 'Example Cloud Pro costs $20 per month' }))
+    const preview = await screen.findByRole('dialog')
+    expect(within(preview).getByText('Outdated')).toBeInTheDocument()
+    expect(within(preview).getByText('was $20 per month, now $25 per month as of 1 October 2026')).toBeInTheDocument()
+    expect(within(preview).getByRole('button', { name: 'Show details' })).toBeInTheDocument()
+    expect(within(preview).queryByText('Why this claim was checked')).toBeNull()
+  })
+
+  it('at 1280px Show details opens the claim in the inspector', async () => {
+    setScreenWide(true)
+    fake = setup(streamedAnswer, completeReport())
+    await send()
+    await screen.findByText('2 claims checked. 1 claim is outdated.', {}, { timeout: 3000 })
+    await userEvent.hover(screen.getByRole('button', { name: 'Example Cloud Pro costs $20 per month' }))
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Show details' }))
+    const inspector = screen.getByRole('complementary', { name: 'Claims in this answer' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(within(inspector).getByRole('button', { name: /Example Cloud Pro costs/ })).toHaveAttribute('aria-expanded', 'true')
+    expect(within(inspector).getByText('Why this claim was checked')).toBeInTheDocument()
+  })
+
+  it("below 1280px Show details opens the sheet with the claim's details", async () => {
+    setScreenWide(false)
+    fake = setup(streamedAnswer, completeReport())
+    await send()
+    await screen.findByText('2 claims checked. 1 claim is outdated.', {}, { timeout: 3000 })
+    await userEvent.hover(screen.getByRole('button', { name: 'Example Cloud Pro costs $20 per month' }))
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Show details' }))
+    const sheet = await screen.findByRole('dialog', { name: 'Claims in this answer' })
+    expect(within(sheet).getByText('Why this claim was checked')).toBeInTheDocument()
+    expect(within(sheet).getByRole('button', { name: /Example Cloud Pro costs/ })).toHaveAttribute('aria-expanded', 'true')
   })
 })

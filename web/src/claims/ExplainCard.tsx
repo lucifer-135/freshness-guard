@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { Link } from 'react-router'
 import { decayModel } from './decay'
 import { DecayCurve } from './DecayCurve'
 import { formatDate, percent } from './format'
 import { safeHref } from './links'
+import { plainSnippet } from './snippet'
 import { STATUS_META, uiStatus } from './status'
 import type { Category, Claim, Report, Stance } from '@/api/types'
 
@@ -21,6 +23,32 @@ const stanceLabel: Record<Stance, string> = {
   supports: 'Supports the claim',
   contradicts: 'Contradicts the claim',
   neutral: 'Does not decide the claim',
+}
+
+// Excerpt shows a search-result excerpt as plain text, clamped to three lines
+// when it is long. An excerpt that is only Markdown syntax is left out.
+function Excerpt({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const plain = plainSnippet(text)
+  if (!plain) return null
+  const long = plain.length > 240
+  return (
+    <>
+      <p data-excerpt className={`mt-1 text-text-muted [overflow-wrap:anywhere] ${long && !expanded ? 'line-clamp-3' : ''}`}>
+        {plain}
+      </p>
+      {long && (
+        <button
+          type="button"
+          aria-expanded={expanded}
+          onClick={() => setExpanded(!expanded)}
+          className="text-xs text-link underline underline-offset-4 hover:text-link-strong"
+        >
+          {expanded ? 'Show less of the excerpt' : 'Show the full excerpt'}
+        </button>
+      )}
+    </>
+  )
 }
 
 function Eyebrow({ children }: { children: string }) {
@@ -94,10 +122,10 @@ export function ExplainCard({ claim, report }: { claim: Claim; report: Report })
                     </p>
                     <p className="font-mono text-xs text-text-subtle">
                       {e.domain}
-                      {e.published_date && formatDate(e.published_date) && ` · ${formatDate(e.published_date)}`}
+                      {e.published_date && formatDate(e.published_date) && ` · Published ${formatDate(e.published_date)}`}
                       {e.authority === 1 && ' · Authoritative source'}
                     </p>
-                    <p className="mt-1 text-text-muted [overflow-wrap:anywhere]">{e.snippet}</p>
+                    <Excerpt text={e.snippet} />
                     <p className="mt-1 text-xs text-text">{stanceLabel[e.stance]}</p>
                   </li>
                 )

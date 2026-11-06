@@ -1,7 +1,9 @@
 import type { Claim, Report, Verdict } from '@/api/types'
+import { ExplainCard } from '@/claims/ExplainCard'
 import { ScoreRing } from '@/claims/ScoreRing'
 import { segmentAnswer } from '@/claims/segments'
 import { STATUS_META, uiStatus } from '@/claims/status'
+import StatusMark from '@/components/reactbits/StatusMark'
 
 const rank: Record<Verdict, number> = { WRONG: 0, STALE: 1, UNVERIFIABLE: 2, FRESH: 3, NOT_CHECKED: 4 }
 
@@ -10,31 +12,57 @@ export function byRisk(claims: Claim[]): Claim[] {
   return [...claims].sort((a, b) => rank[a.verdict] - rank[b.verdict] || b.p_changed - a.p_changed)
 }
 
+interface ClaimInspectorProps {
+  report: Report
+  // The claim whose full explanation is open, if any.
+  selectedId: string | null
+  onSelect(claimId: string): void
+}
+
 // ClaimInspector lists a message's claims, riskiest first (DESIGN.md section 7.1).
-export function ClaimInspector({ report, onSelect }: { report: Report; onSelect(claimId: string): void }) {
+// The selected claim opens its full explanation under its row.
+export function ClaimInspector({ report, selectedId, onSelect }: ClaimInspectorProps) {
   const unplaced = new Set(segmentAnswer(report.answer_text, report.claims).unplaced.map((c) => c.id))
   if (report.claims.length === 0) return <p className="text-sm text-text-muted">This answer has no claims to list.</p>
   return (
     <ul className="space-y-2">
       {byRisk(report.claims).map((c) => {
-        const meta = STATUS_META[uiStatus(c, report.status)]
+        const status = uiStatus(c, report.status)
+        const meta = STATUS_META[status]
+        const selected = c.id === selectedId
+        const outdated = c.verdict === 'STALE' || c.verdict === 'WRONG'
         return (
           <li key={c.id}>
             <button
               type="button"
               onClick={() => onSelect(c.id)}
               disabled={unplaced.has(c.id)}
-              className="flex w-full items-start gap-3 rounded-md border border-border bg-surface-2 p-2 text-left transition-colors duration-[var(--dur-hover)] hover:border-border-strong disabled:cursor-default"
+              aria-expanded={selected}
+              className="flex w-full items-start gap-3 rounded-md border border-border bg-surface-2 p-2 text-left transition-colors duration-[var(--dur-hover)] hover:border-border-strong aria-expanded:border-border-strong disabled:cursor-default"
             >
-              <ScoreRing score={c.score} size="sm" />
+              {status === 'pending' ? (
+                <span aria-hidden="true" className="inline-flex size-7 shrink-0 items-center justify-center">
+                  <StatusMark status="running" size={28} color="var(--text-muted)" />
+                </span>
+              ) : (
+                <ScoreRing score={c.score} size="sm" />
+              )}
               <span className="min-w-0 space-y-0.5 text-sm">
                 <span className="block [overflow-wrap:anywhere]">{c.quote}</span>
                 <span className="block text-xs text-text-muted">{meta.label}</span>
+                {outdated && c.current_value && (
+                  <span className="block font-mono text-xs text-text-muted [overflow-wrap:anywhere]">{`${c.value} → ${c.current_value}`}</span>
+                )}
                 {unplaced.has(c.id) && (
                   <span className="block text-xs text-text-subtle">This claim could not be located in the answer text.</span>
                 )}
               </span>
             </button>
+            {selected && (
+              <div className="mt-2 rounded-md border border-border bg-surface-1 p-3">
+                <ExplainCard claim={c} report={report} />
+              </div>
+            )}
           </li>
         )
       })}

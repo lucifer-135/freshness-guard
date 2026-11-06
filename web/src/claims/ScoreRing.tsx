@@ -6,7 +6,7 @@ function bandColor(score: number): string {
 
 // ScoreRing draws a freshness score as a partly drained ring (DESIGN.md section 2).
 export function ScoreRing({ score, size = 'md' }: { score: number | null; size?: 'sm' | 'md' }) {
-  const px = size === 'sm' ? 24 : 40
+  const px = size === 'sm' ? 28 : 40
   const stroke = size === 'sm' ? 3 : 4
   const r = (px - stroke) / 2
   const circumference = 2 * Math.PI * r
@@ -33,7 +33,7 @@ export function ScoreRing({ score, size = 'md' }: { score: number | null; size?:
           />
         )}
       </svg>
-      <span className={`absolute font-mono tabular-nums ${size === 'sm' ? 'text-[9px]' : 'text-xs'}`} aria-hidden="true">
+      <span className={`absolute font-mono tabular-nums ${size === 'sm' ? 'text-[10px]' : 'text-xs'}`} aria-hidden="true">
         {score ?? '–'}
       </span>
     </span>

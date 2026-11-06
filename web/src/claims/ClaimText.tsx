@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
+import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
 import { ExplainCard } from './ExplainCard'
 import { segmentAnswer } from './segments'
 import { STATUS_META, uiStatus, type UiStatus } from './status'
@@ -14,6 +14,22 @@ function statusVar(status: UiStatus): string {
   return `var(--status-${status === 'pending' ? 'unchecked' : status})`
 }
 
+// CardSlot calls the caller's renderCard with `close` as a prop, so that the
+// function that reads refs is never invoked while ClaimText itself renders.
+function CardSlot({
+  render,
+  claim,
+  report,
+  close,
+}: {
+  render: (claim: Claim, report: Report, close: () => void) => ReactNode
+  claim: Claim
+  report: Report
+  close: () => void
+}) {
+  return <>{render(claim, report, close)}</>
+}
+
 interface ClaimTextProps {
   text: string
   claims: Claim[]
@@ -23,12 +39,15 @@ interface ClaimTextProps {
   // When set, the parent controls which card is pinned open (the claim inspector does).
   openClaimId?: string | null
   onOpenChange?: (id: string | null) => void
+  // The card shown beside a claim; `close` closes it and returns focus to the claim.
+  // The default is the full explain card.
+  renderCard?: (claim: Claim, report: Report, close: () => void) => ReactNode
 }
 
 // ClaimText renders an answer with each claim underlined by its status. Claims
 // are focusable buttons whose description gives the status in words, so the
 // meaning never depends on colour or underline style alone.
-export function ClaimText({ text, claims, reportStatus, report, openClaimId, onOpenChange }: ClaimTextProps) {
+export function ClaimText({ text, claims, reportStatus, report, openClaimId, onOpenChange, renderCard }: ClaimTextProps) {
   const idPrefix = useId()
   const { segments } = segmentAnswer(text, claims)
   const placed = segments.flatMap((s) => (s.kind === 'claim' ? [s.claim] : []))
@@ -112,7 +131,7 @@ export function ClaimText({ text, claims, reportStatus, report, openClaimId, onO
             <Popover key={i} open={open} onOpenChange={(next) => !next && close(id)}>
               <PopoverAnchor asChild>{span}</PopoverAnchor>
               <PopoverContent
-                className="max-h-[70vh] w-96 max-w-[calc(100vw-2rem)] overflow-y-auto bg-surface-3 shadow-[var(--shadow-float)]"
+                className={`max-h-[70vh] max-w-[calc(100vw-2rem)] overflow-y-auto bg-surface-3 shadow-[var(--shadow-float)] ${renderCard ? 'w-auto' : 'w-96'}`}
                 // A card opened by hovering must not take focus from the reader.
                 onOpenAutoFocus={(e) => pinned !== id && e.preventDefault()}
                 onCloseAutoFocus={(e) => e.preventDefault()}
@@ -120,7 +139,11 @@ export function ClaimText({ text, claims, reportStatus, report, openClaimId, onO
                 onPointerEnter={() => clearTimeout(timer.current)}
                 onPointerLeave={() => hoverSoon(null, CLOSE_DELAY_MS)}
               >
-                <ExplainCard claim={s.claim} report={{ ...report, status: reportStatus }} />
+                {renderCard ? (
+                  <CardSlot render={renderCard} claim={s.claim} report={{ ...report, status: reportStatus }} close={() => close(id)} />
+                ) : (
+                  <ExplainCard claim={s.claim} report={{ ...report, status: reportStatus }} />
+                )}
               </PopoverContent>
             </Popover>
           )

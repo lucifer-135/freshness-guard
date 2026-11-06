@@ -1,5 +1,5 @@
 import { ListChecks } from 'lucide-react'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { ClaimInspector } from './ClaimInspector'
 import { Composer } from './Composer'
 import { MessageView } from './MessageView'
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import GradualBlur from '@/components/reactbits/GradualBlur'
 import { Segmented } from '@/components/Segmented'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { useMediaQuery } from '@/lib/useMediaQuery'
 import { useReport } from '@/live/useReport'
 import { useStatus } from '@/shell/TopBar'
 
@@ -34,30 +35,32 @@ export function ChatPage() {
 function Conversation() {
   const { messages, busy, send } = useChat()
   const syncTimeoutMs = useStatus().data?.settings.sync_timeout_ms ?? 8000
-  const [openClaim, setOpenClaim] = useState<string | null>(null)
+  // From 1280px the inspector sits beside the chat; below that it is a sheet.
+  const wide = useMediaQuery('(min-width: 1280px)')
+  const [selectedClaim, setSelectedClaim] = useState<string | null>(null)
   const [announcement, setAnnouncement] = useState('')
   const [sheetOpen, setSheetOpen] = useState(false)
-  // A claim chosen in the sheet opens once the sheet has closed; opening it
-  // earlier would lose it when the sheet returns focus to its trigger.
-  const claimAfterSheet = useRef<string | null>(null)
   const onStatus = useCallback((sentence: string) => setAnnouncement(sentence), [])
 
   const latest = [...messages].reverse().find((m): m is AssistantMessage => m.role === 'assistant' && m.reportId !== null)
   const report = useReport(latest?.reportId ?? null, { enabled: latest?.phase === 'done' && latest.mode !== 'off' })
 
+  // A row in the inspector opens that claim's details there and brings the claim into view in the answer.
   function select(claimId: string) {
-    if (sheetOpen) {
-      claimAfterSheet.current = claimId
-      setSheetOpen(false)
-      return
-    }
-    setOpenClaim(claimId)
+    setSelectedClaim(claimId)
     // Claim IDs repeat across reports (c1, c2, ...), so look only inside the latest answer.
     const scope = latest && document.querySelector(`[data-message-id="${CSS.escape(latest.id)}"]`)
     scope?.querySelector(`[data-claim-id="${CSS.escape(claimId)}"]`)?.scrollIntoView?.({ block: 'center' })
   }
 
-  const inspector = report.data && <ClaimInspector report={report.data} onSelect={select} />
+  // "Show details" in a claim's preview, or a click on the claim, opens the details where the inspector is.
+  function showDetails(claimId: string) {
+    setSelectedClaim(claimId)
+    if (!wide) setSheetOpen(true)
+  }
+
+  const inspector = (selectedId: string | null) =>
+    report.data && <ClaimInspector report={report.data} selectedId={selectedId} onSelect={select} />
 
   return (
     <div className="flex gap-6">
@@ -73,14 +76,15 @@ function Conversation() {
               <MessageView
                 message={m}
                 syncTimeoutMs={syncTimeoutMs}
-                openClaimId={m === latest ? openClaim : undefined}
-                onOpenChange={m === latest ? setOpenClaim : undefined}
+                openClaimId={m === latest ? null : undefined}
+                onOpenChange={m === latest ? (id) => id && showDetails(id) : undefined}
+                onShowDetails={m === latest ? showDetails : undefined}
                 onStatus={m === latest ? onStatus : undefined}
               />
             </div>
           ))
         )}
-        {inspector && (
+        {report.data && (
           <div className="xl:hidden">
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
               <SheetTrigger asChild>
@@ -89,21 +93,11 @@ function Conversation() {
                   Claims
                 </Button>
               </SheetTrigger>
-              <SheetContent
-                side="bottom"
-                className="max-h-[70vh] overflow-y-auto p-4"
-                onCloseAutoFocus={(e) => {
-                  const claimId = claimAfterSheet.current
-                  if (!claimId) return
-                  e.preventDefault()
-                  claimAfterSheet.current = null
-                  select(claimId)
-                }}
-              >
+              <SheetContent side="bottom" className="max-h-[70vh] overflow-y-auto p-4">
                 <SheetHeader>
                   <SheetTitle>Claims in this answer</SheetTitle>
                 </SheetHeader>
-                {inspector}
+                {inspector(wide ? null : selectedClaim)}
               </SheetContent>
             </Sheet>
           </div>
@@ -115,10 +109,10 @@ function Conversation() {
           <Composer busy={busy} onSend={send} />
         </div>
       </div>
-      {inspector && (
+      {report.data && (
         <aside aria-label="Claims in this answer" className="hidden w-[360px] shrink-0 space-y-3 xl:block">
           <h2 className="eyebrow">Claims in this answer</h2>
-          {inspector}
+          {inspector(wide ? selectedClaim : null)}
         </aside>
       )}
     </div>

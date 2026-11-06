@@ -93,6 +93,31 @@ describe('ExplainCard', () => {
     expect(container.querySelector('script')).toBeNull()
   })
 
+  it('dates a source as the date of its page, not of the fact', () => {
+    inRouter(<ExplainCard claim={staleClaim()} report={completeReport()} />)
+    expect(screen.getByText(/example\.com · Published 1 October 2026/)).toBeInTheDocument()
+  })
+
+  it('shows an excerpt as plain text and clamps a long one behind a button', () => {
+    const claim = staleClaim()
+    claim.evidence = [{ ...claim.evidence[0], snippet: `### Release notes ${'Python 3.15.2 was released. '.repeat(20)}` }]
+    inRouter(<ExplainCard claim={claim} report={completeReport()} />)
+    expect(screen.queryByText(/###/)).toBeNull()
+    const excerpt = screen.getByText(/^Release notes Python 3\.15\.2 was released\./)
+    expect(excerpt).toHaveClass('line-clamp-3')
+    fireEvent.click(screen.getByRole('button', { name: 'Show the full excerpt' }))
+    expect(excerpt).not.toHaveClass('line-clamp-3')
+    expect(screen.getByRole('button', { name: 'Show less of the excerpt' })).toBeInTheDocument()
+  })
+
+  it('leaves out the excerpt when it is only Markdown syntax', () => {
+    const claim = staleClaim()
+    claim.evidence = [{ ...claim.evidence[0], snippet: '### ' }]
+    const { container } = inRouter(<ExplainCard claim={claim} report={completeReport()} />)
+    expect(screen.queryByText(/###/)).toBeNull()
+    expect(container.querySelector('[data-excerpt]')).toBeNull()
+  })
+
   it('shows the score parts of a current claim', () => {
     inRouter(<ExplainCard claim={freshClaim()} report={completeReport()} />)
     expect(screen.getByText('Evidence recency 90%')).toBeInTheDocument()
@@ -114,6 +139,30 @@ describe('ClaimText explain cards', () => {
     inRouter(<ClaimText text={answer} claims={report.claims} reportStatus="complete" report={report} />)
     return screen.getByRole('button', { name: 'Example Cloud Pro costs $20 per month' })
   }
+
+  it('shows the card that renderCard returns instead of the explain card', () => {
+    vi.useFakeTimers()
+    const report = completeReport()
+    inRouter(
+      <ClaimText
+        text={answer}
+        claims={report.claims}
+        reportStatus="complete"
+        report={report}
+        renderCard={(claim, _report, close) => (
+          <button type="button" onClick={close}>
+            {`Preview of ${claim.id}`}
+          </button>
+        )}
+      />,
+    )
+    fireEvent.pointerOver(screen.getByRole('button', { name: 'Example Cloud Pro costs $20 per month' }))
+    act(() => vi.advanceTimersByTime(120))
+    expect(screen.getByRole('button', { name: 'Preview of c1' })).toBeInTheDocument()
+    expect(screen.queryByText('Why this claim was checked')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Preview of c1' }))
+    expect(screen.queryByRole('button', { name: 'Preview of c1' })).toBeNull()
+  })
 
   it('opens on a resting pointer without moving focus and closes after the pointer leaves', () => {
     vi.useFakeTimers()
