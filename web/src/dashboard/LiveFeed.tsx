@@ -49,7 +49,7 @@ export function LiveFeed() {
       {reports.data && shown.length === 0 && (
         <p className="text-text-muted">No answers have been checked yet. Send a message in the chat to see results here.</p>
       )}
-      <ol aria-label="Recent reports" className="space-y-2 overflow-y-auto">
+      <ol aria-label="Recent reports" className="divide-y divide-border overflow-y-auto rounded-lg border border-border bg-surface-1 empty:hidden">
         <AnimatePresence initial={false}>
           {shown.map((r) => (
             <motion.li
@@ -58,17 +58,15 @@ export function LiveFeed() {
               animate={reduced ? { opacity: 1 } : { opacity: 1, y: 0 }}
               transition={{ duration: reduced ? 0.08 : 0.22 }}
             >
-              <Link
-                to={`/reports/${r.id}`}
-                className="flex items-center gap-3 rounded-lg border border-border bg-surface-1 p-3 hover:bg-surface-3"
-              >
+              <Link to={`/reports/${r.id}`} className="flex h-10 items-center gap-3 px-3 text-sm hover:bg-surface-3">
                 <ScoreRing score={r.score} size="sm" />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-mono text-xs">{r.model || 'Pasted text'}</span>
-                  <span className="block text-sm text-text-muted">
-                    {statusLabel[r.status]}, {r.stale_count} outdated, {formatDateTime(r.created_at)}
-                  </span>
+                <span className="min-w-0 flex-1 truncate font-mono text-xs">{r.model || 'Pasted text'}</span>
+                <span className="shrink-0 text-text-muted">
+                  {r.status === 'complete' ? `${r.stale_count} outdated` : statusLabel[r.status]}
                 </span>
+                <time dateTime={r.created_at} className="shrink-0 text-xs text-text-muted tabular-nums">
+                  {formatDateTime(r.created_at)}
+                </time>
               </Link>
             </motion.li>
           ))}

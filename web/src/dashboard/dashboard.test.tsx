@@ -279,6 +279,26 @@ describe('DashboardPage live feed', () => {
     expect(fake.requests.find((r) => r.path === '/freshness/reports')?.url.searchParams.get('limit')).toBe('50')
   })
 
+  it('shows each report on one line with its time', async () => {
+    ;({ fake } = setup({ 'GET /freshness/reports': () => json(200, { reports: reports('r1') }) }))
+    const [link] = await within(await screen.findByRole('list', { name: 'Recent reports' })).findAllByRole('link')
+    expect(link).toHaveTextContent('1 outdated')
+    expect(link.querySelector('time')).toHaveAttribute('dateTime', completeReport().created_at)
+  })
+
+  it('shows the status when a report is not complete', async () => {
+    ;({ fake } = setup({ 'GET /freshness/reports': () => json(200, { reports: [completeReport({ id: 'r1', status: 'pending' })] }) }))
+    const [link] = await within(await screen.findByRole('list', { name: 'Recent reports' })).findAllByRole('link')
+    expect(link).toHaveTextContent('Checking')
+    expect(link).not.toHaveTextContent('outdated')
+  })
+
+  it('names pasted text when a report has no model', async () => {
+    ;({ fake } = setup({ 'GET /freshness/reports': () => json(200, { reports: [completeReport({ id: 'r1', model: '' })] }) }))
+    const [link] = await within(await screen.findByRole('list', { name: 'Recent reports' })).findAllByRole('link')
+    expect(link).toHaveTextContent('Pasted text')
+  })
+
   it('freezes the feed while it is paused and keeps focus on the pause button', async () => {
     let list = reports('r1')
     const { queryClient, fake: f } = setup({ 'GET /freshness/reports': () => json(200, { reports: list }) })
