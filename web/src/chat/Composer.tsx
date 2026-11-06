@@ -7,7 +7,7 @@ import type { Mode, Policy } from '@/api/types'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Textarea } from '@/components/ui/textarea'
-import { MagneticButton } from '@/motion/MagneticButton'
+import { Button } from '@/components/ui/button'
 import { useStatus } from '@/shell/TopBar'
 
 const MODEL_KEY = 'fg.model'
@@ -127,10 +127,10 @@ export function Composer({ busy, onSend }: ComposerProps) {
         <Label htmlFor={messageId}>Message</Label>
         <Textarea id={messageId} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={onKeyDown} rows={3} />
       </div>
-      <MagneticButton type="submit" className="h-10" disabled={!canSend}>
+      <Button type="submit" className="h-10" disabled={!canSend}>
         <Send aria-hidden="true" />
         Send
-      </MagneticButton>
+      </Button>
     </form>
   )
 }

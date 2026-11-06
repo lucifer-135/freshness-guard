@@ -1,8 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { Outlet, useLocation } from 'react-router'
 import { ChatProvider } from '@/chat/ChatProvider'
-import { NavRail } from './NavRail'
-import { CursorAura } from '@/motion/CursorAura'
 import { SignalField } from '@/motion/SignalField'
 import { TopBar } from './TopBar'
 
@@ -21,7 +19,7 @@ export function AppShell() {
   }, [pathname])
 
   return (
-    <div className="relative isolate flex min-h-dvh flex-col text-text lg:flex-row">
+    <div className="relative isolate flex min-h-dvh flex-col text-text">
       <a
         href="#main"
         className="sr-only z-[100] rounded-md bg-surface-3 px-3 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
@@ -29,16 +27,12 @@ export function AppShell() {
         Skip to main content
       </a>
       <SignalField />
-      <CursorAura />
-      <NavRail />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar />
-        <main id="main" ref={main} tabIndex={-1} className="flex-1 p-4 outline-none lg:p-6">
-          <ChatProvider>
-            <Outlet />
-          </ChatProvider>
-        </main>
-      </div>
+      <TopBar />
+      <main id="main" ref={main} tabIndex={-1} className="min-w-0 flex-1 p-4 outline-none lg:p-6">
+        <ChatProvider>
+          <Outlet />
+        </ChatProvider>
+      </main>
     </div>
   )
 }

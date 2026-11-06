@@ -1,8 +1,5 @@
-import { act, fireEvent, render, renderHook, screen } from '@testing-library/react'
-import { Profiler } from 'react'
+import { act, fireEvent, render, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { CursorAura } from './CursorAura'
-import { MagneticButton } from './MagneticButton'
 import { SignalField } from './SignalField'
 import { useFineMotion } from './useFineMotion'
 
@@ -53,38 +50,6 @@ describe('useFineMotion', () => {
   })
 })
 
-describe('CursorAura', () => {
-  it('renders nothing with reduced motion', () => {
-    mockMedia(['reduce'])
-    const { container } = render(<CursorAura />)
-    expect(container).toBeEmptyDOMElement()
-  })
-
-  it('becomes a lens over a claim without re-rendering', () => {
-    mockMedia([])
-    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
-      cb(0)
-      return 1
-    })
-    const onRender = vi.fn()
-    render(
-      <>
-        <span data-claim-status="outdated">claim</span>
-        <Profiler id="aura" onRender={onRender}>
-          <CursorAura />
-        </Profiler>
-      </>,
-    )
-    const aura = document.querySelector('[data-aura]') as HTMLElement
-    expect(aura).toHaveAttribute('aria-hidden', 'true')
-    const renders = onRender.mock.calls.length
-    fireEvent.pointerMove(screen.getByText('claim'), { clientX: 10, clientY: 10 })
-    expect(aura.dataset.mode).toBe('lens')
-    expect(aura.style.getPropertyValue('--aura-color')).toBe('var(--status-outdated)')
-    expect(onRender.mock.calls.length).toBe(renders)
-  })
-})
-
 describe('SignalField', () => {
   it('is not drawn with reduced motion', () => {
     mockMedia(['reduce'])
@@ -103,15 +68,5 @@ describe('SignalField', () => {
     fireEvent(document, new Event('visibilitychange'))
     expect(cancel).toHaveBeenCalledWith(7)
     Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
-  })
-})
-
-describe('MagneticButton', () => {
-  it('does not move with reduced motion', () => {
-    mockMedia(['reduce'])
-    render(<MagneticButton>Send</MagneticButton>)
-    const button = screen.getByRole('button', { name: 'Send' })
-    fireEvent.pointerMove(button, { clientX: 50, clientY: 50 })
-    expect(button.closest('[style*="transform"]')).toBeNull()
   })
 })

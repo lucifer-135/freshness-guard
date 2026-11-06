@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea'
 import type { Report } from '@/api/types'
 import { mergeReport, reportKey } from '@/live/reportCache'
 import { useReport } from '@/live/useReport'
-import { MagneticButton } from '@/motion/MagneticButton'
+import { Button } from '@/components/ui/button'
 
 // The plugin's POST /freshness/check limit, counted in characters (runes).
 const MAX_CHARACTERS = 20000
@@ -83,10 +83,10 @@ export function CheckPanel() {
               {error}
             </p>
           )}
-          <MagneticButton type="submit" className="h-10" disabled={!canCheck}>
+          <Button type="submit" className="h-10" disabled={!canCheck}>
             <SearchCheck aria-hidden="true" />
             Check this answer
-          </MagneticButton>
+          </Button>
         </form>
 
         {data && (

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -39,6 +39,21 @@ describe('AppShell', () => {
     expect(skip).toHaveAttribute('href', '#main')
     expect(screen.getByRole('link', { name: 'Chat' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('link', { name: 'Reports' })).not.toHaveAttribute('aria-current')
+  })
+
+  it('puts the main navigation inside the page header', async () => {
+    fake = fakeFetch({ 'GET /freshness/status': () => status(true, 9), 'GET /freshness/events': endedStream })
+    renderAt('/chat')
+    const nav = within(screen.getByRole('banner')).getByRole('navigation', { name: 'Main' })
+    for (const name of ['Chat', 'Dashboard', 'Reports']) {
+      expect(within(nav).getByRole('link', { name })).toBeInTheDocument()
+    }
+  })
+
+  it('draws no cursor aura', () => {
+    fake = fakeFetch({ 'GET /freshness/status': () => status(true, 9), 'GET /freshness/events': endedStream })
+    renderAt('/chat')
+    expect(document.querySelector('[data-aura]')).toBeNull()
   })
 
   it('shows gateway status, credits and the live connection', async () => {
