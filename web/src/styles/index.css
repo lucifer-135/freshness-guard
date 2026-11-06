@@ -130,6 +130,18 @@
     -webkit-font-smoothing: antialiased;
   }
 
+  /* DESIGN.md section 15: numbers that change keep their width, and headings sit tight. */
+  table,
+  time {
+    font-variant-numeric: tabular-nums;
+  }
+
+  h1,
+  h2 {
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+
   /* DESIGN.md section 9: 2px accent focus rings with a 2px offset, never removed. */
   :focus-visible {
     outline: 2px solid var(--accent);
