@@ -35,23 +35,7 @@ Tests, documentation and upstream readiness. The repository has unit, end-to-end
 
 ## Architecture
 
-```mermaid
-flowchart LR
-  client[Client] --> bifrost[Bifrost]
-  bifrost --> pre[PreLLMHook<br/>record prompt and model]
-  pre --> provider[Model provider]
-  provider --> post[PostLLMHook<br/>submit the answer]
-  post --> queue[Bounded queue and workers]
-  queue --> pipeline[Extract, triage, verify, score]
-  pipeline --> tavily[Tavily search]
-  pipeline --> llm[Extract and judge models<br/>through Bifrost]
-  pipeline --> store[(SQLite: reports, claims, facts)]
-  post -. sync mode waits, then heals or blocks .-> bifrost
-  bifrost --> headers[Response headers<br/>X-Freshness-*]
-  store --> api[Plugin API: reports, events, chat, dashboard data, MCP]
-  api --> web[Web app]
-  pipeline -- outdated fact --> purge[Remove cached answers<br/>from the semantic cache]
-```
+![Architecture: a client calls the Bifrost gateway; the plugin hooks queue each answer for the claim check, which uses Tavily and judge models, stores results in SQLite, can heal or block in sync mode, removes outdated cached answers, and serves the plugin API and web app.](docs/images/architecture.svg)
 
 | Package | Purpose |
 |---|---|

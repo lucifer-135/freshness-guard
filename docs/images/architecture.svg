@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 600" width="1180" height="600" role="img" aria-labelledby="title desc">
+  <title id="title">Freshness Guard architecture</title>
+  <desc id="desc">A client sends a chat request through the Bifrost gateway to a model provider. The plugin's hooks record the prompt and submit the answer to a bounded queue. The check pipeline extracts, triages, verifies and scores claims, using Tavily search and judge models called through Bifrost, and stores reports, claims and facts in SQLite. In sync mode the gateway waits and may heal or block the answer. Response headers carry the freshness status. Outdated facts remove cached answers from the semantic cache. The plugin API serves reports, events and an MCP tool to the web app.</desc>
+  <defs>
+    <style>
+      .bg { fill: #07090D; }
+      .box { fill: #131923; stroke: #263041; stroke-width: 1.5; }
+      .hub { fill: #131923; stroke: #60A5FA; stroke-width: 1.5; }
+      .core { fill: #131923; stroke: #3A475C; stroke-width: 1.5; }
+      .t { font: 600 16px "IBM Plex Sans", "Segoe UI", Helvetica, Arial, sans-serif; fill: #E8EDF5; }
+      .s { font: 400 12.5px "IBM Plex Sans", "Segoe UI", Helvetica, Arial, sans-serif; fill: #94A3B8; }
+      .m { font: 400 11px "JetBrains Mono", Consolas, monospace; fill: #7C8BA1; letter-spacing: 0.06em; }
+      .label { font: 400 12px "IBM Plex Sans", "Segoe UI", Helvetica, Arial, sans-serif; fill: #94A3B8; }
+      .line { fill: none; stroke: #3A475C; stroke-width: 1.6; }
+      .flow { fill: none; stroke: #60A5FA; stroke-width: 1.8; stroke-dasharray: 6 6; animation: flow 1.6s linear infinite; }
+      .back { fill: none; stroke: #94A3B8; stroke-width: 1.4; stroke-dasharray: 3 5; animation: flow 2.4s linear infinite reverse; }
+      .purge { fill: none; stroke: #FB7185; stroke-width: 1.6; stroke-dasharray: 6 6; animation: flow 2s linear infinite; }
+      .pulse { fill: none; stroke: #60A5FA; stroke-width: 2; opacity: 0; animation: pulse 3.2s ease-out infinite; }
+      @keyframes flow { to { stroke-dashoffset: -24; } }
+      @keyframes pulse { 0% { opacity: 0.55; } 60%, 100% { opacity: 0; } }
+      @media (prefers-reduced-motion: reduce) { .flow, .back, .purge, .pulse { animation: none; } .pulse { opacity: 0; } }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#60A5FA"/>
+    </marker>
+    <marker id="arrow-muted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#94A3B8"/>
+    </marker>
+    <marker id="arrow-rose" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#FB7185"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" width="1180" height="600" rx="16"/>
+
+  <!-- Request path -->
+  <text class="m" x="40" y="34">REQUEST PATH</text>
+  <rect class="box" x="40" y="56" width="160" height="72" rx="10"/>
+  <text class="t" x="60" y="88">Client</text>
+  <text class="s" x="60" y="110">App, chat page or SDK</text>
+
+  <rect class="hub" x="280" y="40" width="340" height="104" rx="12"/>
+  <text class="t" x="300" y="72">Bifrost gateway</text>
+  <text class="s" x="300" y="96">PreLLMHook records the prompt and model</text>
+  <text class="s" x="300" y="116">PostLLMHook submits the answer</text>
+  <text class="m" x="300" y="134">FRESHNESS GUARD PLUGIN (.so)</text>
+
+  <rect class="box" x="720" y="56" width="200" height="72" rx="10"/>
+  <text class="t" x="740" y="88">Model provider</text>
+  <text class="s" x="740" y="110">Groq, Gemini, OpenRouter</text>
+
+  <path class="flow" d="M200 82 H276" marker-end="url(#arrow)"/>
+  <path class="flow" d="M620 82 H716" marker-end="url(#arrow)"/>
+  <path class="back" d="M720 108 H624" marker-end="url(#arrow-muted)"/>
+  <path class="back" d="M280 112 H204" marker-end="url(#arrow-muted)"/>
+  <text class="label" x="40" y="152">reply: the answer and</text>
+  <text class="label" x="40" y="168">X-Freshness-* headers</text>
+
+  <!-- Check pipeline -->
+  <text class="m" x="280" y="206">CHECK PIPELINE</text>
+  <rect class="box" x="280" y="230" width="180" height="72" rx="10"/>
+  <text class="t" x="300" y="262">Bounded queue</text>
+  <text class="s" x="300" y="284">workers, credit budget</text>
+
+  <rect class="core" x="520" y="214" width="320" height="104" rx="12"/>
+  <rect class="pulse" x="520" y="214" width="320" height="104" rx="12"/>
+  <text class="t" x="540" y="246">Claim check</text>
+  <text class="s" x="540" y="270">extract → triage → verify → score</text>
+  <text class="s" x="540" y="290">heal or block in sync mode</text>
+
+  <rect class="box" x="900" y="230" width="240" height="72" rx="10"/>
+  <text class="t" x="920" y="262">SQLite</text>
+  <text class="s" x="920" y="284">reports, claims, verified facts</text>
+
+  <path class="flow" d="M370 144 V226" marker-end="url(#arrow)"/>
+  <path class="flow" d="M460 266 H516" marker-end="url(#arrow)"/>
+  <path class="flow" d="M840 266 H896" marker-end="url(#arrow)"/>
+  <path class="back" d="M590 214 V148" marker-end="url(#arrow-muted)"/>
+  <text class="label" x="600" y="182">sync mode: the gateway waits</text>
+
+  <!-- Live sources and outputs -->
+  <text class="m" x="280" y="384">SOURCES AND OUTPUTS</text>
+  <rect class="box" x="520" y="400" width="150" height="72" rx="10"/>
+  <text class="t" x="540" y="432">Tavily</text>
+  <text class="s" x="540" y="454">live web search</text>
+
+  <rect class="box" x="690" y="400" width="150" height="72" rx="10"/>
+  <text class="t" x="710" y="432">Judge models</text>
+  <text class="s" x="710" y="454">called through Bifrost</text>
+
+  <rect class="box" x="280" y="400" width="200" height="72" rx="10"/>
+  <text class="t" x="300" y="432">Semantic cache</text>
+  <text class="s" x="300" y="454">outdated answers removed</text>
+
+  <rect class="box" x="900" y="400" width="240" height="72" rx="10"/>
+  <text class="t" x="920" y="432">Plugin API</text>
+  <text class="s" x="920" y="454">reports, live events, MCP tool</text>
+
+  <rect class="box" x="900" y="506" width="240" height="64" rx="10"/>
+  <text class="t" x="920" y="536">Web app</text>
+  <text class="s" x="920" y="556">chat and dashboard</text>
+
+  <path class="flow" d="M595 318 V396" marker-end="url(#arrow)"/>
+  <path class="flow" d="M765 318 V396" marker-end="url(#arrow)"/>
+  <path class="purge" d="M540 318 V360 H380 V396" marker-end="url(#arrow-rose)"/>
+  <text class="label" x="392" y="352">a fact changed</text>
+  <path class="flow" d="M1020 302 V396" marker-end="url(#arrow)"/>
+  <path class="flow" d="M1020 472 V502" marker-end="url(#arrow)"/>
+
+  <!-- Legend -->
+  <path class="line" d="M40 520 H76" style="stroke:#60A5FA; stroke-dasharray: 6 6"/>
+  <text class="label" x="86" y="524">data flow</text>
+  <path class="line" d="M40 546 H76" style="stroke:#94A3B8; stroke-dasharray: 3 5"/>
+  <text class="label" x="86" y="550">reply to the caller</text>
+  <path class="line" d="M40 572 H76" style="stroke:#FB7185; stroke-dasharray: 6 6"/>
+  <text class="label" x="86" y="576">cache removal</text>
+</svg>
