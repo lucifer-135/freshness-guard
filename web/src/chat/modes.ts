@@ -24,3 +24,15 @@ export function modeHint(mode: Mode, syncTimeoutMs: number): string {
       return 'This answer will not be checked.'
   }
 }
+
+// modeLabel and policyLabel name a stored report's mode and policy in the
+// words the composer uses; a pasted-text check has a mode of its own and no policy.
+export function modeLabel(mode: string): string {
+  if (mode === 'check') return 'Pasted text check'
+  return modeOptions.find((o) => o.value === mode)?.label ?? mode
+}
+
+export function policyLabel(policy: string): string {
+  if (!policy) return 'Not applied'
+  return policyOptions.find((o) => o.value === policy)?.label ?? policy
+}

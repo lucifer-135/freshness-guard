@@ -36,6 +36,8 @@ describe('ReportsPage', () => {
     expect(links.map((l) => l.getAttribute('href'))).toEqual(['/freshness/ui/reports/r1', '/freshness/ui/reports/r2'])
     expect(screen.getByRole('columnheader', { name: 'Outdated' })).toBeInTheDocument()
     expect(fake.requests[0].url.searchParams.get('limit')).toBe('50')
+    expect(screen.getAllByText('Background').length).toBeGreaterThan(0)
+    expect(screen.getByRole('table').parentElement).not.toHaveClass('rounded-xl')
   })
 
   it('explains an empty list', async () => {
@@ -59,6 +61,24 @@ describe('ReportPage', () => {
     expect(screen.getByText('Checked in 6.3 s')).toBeInTheDocument()
     expect(screen.getByText('2 Tavily credits used')).toBeInTheDocument()
     expect(screen.getByText('2 claims checked. 1 claim is outdated.')).toBeInTheDocument()
+  })
+
+  it('names the mode and the policy in words, and sets the report on the page rather than in cards', async () => {
+    fake = renderAt('/reports/r1', { 'GET /freshness/reports/r1': () => json(200, completeReport({ mode: 'sync', policy: 'heal' })) })
+    const original = await screen.findByRole('heading', { name: 'Original answer' })
+    expect(screen.getByText('Before reply')).toBeInTheDocument()
+    expect(screen.getByText('Correct')).toBeInTheDocument()
+    expect(original.parentElement).not.toHaveClass('rounded-xl')
+    for (const item of screen.getAllByRole('listitem').filter((li) => li.closest('[aria-labelledby="claims-title"]'))) {
+      expect(item).not.toHaveClass('rounded-xl')
+    }
+  })
+
+  it('says when no policy applied, as for pasted text', async () => {
+    fake = renderAt('/reports/r1', { 'GET /freshness/reports/r1': () => json(200, completeReport({ mode: 'check', policy: '' })) })
+    await screen.findByRole('heading', { name: 'Original answer' })
+    expect(screen.getByText('Pasted text check')).toBeInTheDocument()
+    expect(screen.getByText('Not applied')).toBeInTheDocument()
   })
 
   it('does not link a claim to the report the reader is already on', async () => {

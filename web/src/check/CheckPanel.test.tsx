@@ -61,6 +61,15 @@ describe('CheckPanel', () => {
     )
   })
 
+  it('sets the form and the checked text on the page, not in cards', async () => {
+    ;({ fake } = setup(() => json(200, completeReport())))
+    expect(field().closest('form')).not.toHaveClass('rounded-xl')
+    fireEvent.change(field(), { target: { value: answer } })
+    await userEvent.click(button())
+    await screen.findAllByText('2 claims checked. 1 claim is outdated.', {}, { timeout: 3000 })
+    expect(screen.getByRole('article')).not.toHaveClass('rounded-xl')
+  })
+
   it('follows a check that is still running', async () => {
     let queryClient: QueryClient
     ;({ fake, queryClient } = setup(() => json(202, { id: 'r1', status: 'pending' })))

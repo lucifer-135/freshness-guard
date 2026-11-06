@@ -61,7 +61,7 @@ export function CheckPanel() {
   return (
     <div className="flex gap-6">
       <div className="min-w-0 flex-1 space-y-4 xl:max-w-[760px]">
-        <form onSubmit={submit} className="space-y-3 rounded-xl border border-border bg-surface-1 p-4">
+        <form onSubmit={submit} className="space-y-3">
           <Label htmlFor={fieldId}>Answer to check</Label>
           <Textarea
             id={fieldId}
@@ -90,7 +90,7 @@ export function CheckPanel() {
         </form>
 
         {data && (
-          <article className="space-y-3 rounded-xl border border-border bg-surface-1 p-4">
+          <article className="space-y-3 border-t border-border pt-6">
             <header className="flex items-center gap-3">
               <ScoreRing score={staggered.reportStatus === 'complete' ? data.score : null} />
               <p aria-live="polite" className="text-sm text-text-muted">

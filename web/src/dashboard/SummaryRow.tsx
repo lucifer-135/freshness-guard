@@ -45,13 +45,15 @@ function Stat({
 }) {
   const labelId = useId()
   return (
-    <div className="rounded-xl border border-border bg-surface-1 p-4">
-      <p id={labelId} className="text-sm text-text-muted">
+    <div className="py-4 lg:px-6 lg:first:pl-0">
+      <dt id={labelId} className="text-sm text-text-muted">
         {label}
-      </p>
-      <p className="mt-1 text-3xl font-semibold tabular-nums">{value}</p>
-      {meter && <Meter labelledBy={labelId} used={meter.used} budget={meter.budget} />}
-      <p className="mt-1 min-h-5 text-sm text-text-muted">{detail}</p>
+      </dt>
+      <dd className="mt-1 text-2xl font-semibold tabular-nums">{value}</dd>
+      <dd className="mt-1 min-h-5 text-sm text-text-muted">
+        {meter && <Meter labelledBy={labelId} used={meter.used} budget={meter.budget} />}
+        {detail}
+      </dd>
     </div>
   )
 }
@@ -62,9 +64,13 @@ export function SummaryRow() {
 
   if (summary.isPending) {
     return (
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-busy="true">
+      <div className="grid border-y border-border sm:grid-cols-2 lg:grid-cols-4 lg:divide-x lg:divide-border" aria-busy="true">
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="h-28 animate-pulse rounded-xl border border-border bg-surface-2" />
+          <div key={i} className="space-y-2 py-4 lg:px-6 lg:first:pl-0">
+            <div className="h-4 w-48 animate-pulse rounded-sm bg-surface-2" />
+            <div className="h-7 w-20 animate-pulse rounded-sm bg-surface-2" />
+            <div className="h-5" />
+          </div>
         ))}
         <p className="sr-only">Loading the summary.</p>
       </div>
@@ -72,7 +78,7 @@ export function SummaryRow() {
   }
   if (summary.isError) {
     return (
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface-2 p-4">
+      <div className="flex flex-wrap items-center gap-3 border-y border-border py-4">
         <p className="text-status-outdated">The summary could not be loaded.</p>
         <Button variant="secondary" onClick={() => void summary.refetch()}>
           Try again
@@ -83,7 +89,8 @@ export function SummaryRow() {
 
   const s = summary.data
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    // One strip of figures divided by hairlines; each figure reads as label, value, detail.
+    <dl className="grid border-y border-border sm:grid-cols-2 lg:grid-cols-4 lg:divide-x lg:divide-border">
       <Stat label="Answers checked in the last 24 hours" value={s.answers} />
       <Stat
         label="Share of checked claims that were outdated"
@@ -102,6 +109,6 @@ export function SummaryRow() {
         value={s.cache_purge_enabled ? s.cache_purges : 'Off'}
         detail={s.cache_purge_enabled ? undefined : 'Cache purge is switched off.'}
       />
-    </div>
+    </dl>
   )
 }

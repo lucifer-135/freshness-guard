@@ -8,7 +8,10 @@ import { SummaryRow } from './SummaryRow'
 export function DashboardPage() {
   return (
     <section className="space-y-6">
-      <h1 className="text-2xl font-semibold">Dashboard</h1>
+      <div>
+        <h1 className="text-2xl font-semibold">Dashboard</h1>
+        <p className="mt-1 text-text-muted">Freshness checks for every answer that passes through this gateway.</p>
+      </div>
       <SummaryRow />
       <div className="grid gap-6 lg:grid-cols-12">
         <div className="lg:col-span-8">

@@ -192,7 +192,7 @@ export function StalenessHeatmap() {
 
   const lb = leaderboard.data
   return (
-    <section aria-labelledby={`${summaryId}-title`} className="h-full space-y-4 rounded-xl border border-border bg-surface-2 p-4">
+    <section aria-labelledby={`${summaryId}-title`} className="h-full space-y-4">
       <h2 id={`${summaryId}-title`} className="text-lg font-semibold">
         Claim rates by model and topic
       </h2>

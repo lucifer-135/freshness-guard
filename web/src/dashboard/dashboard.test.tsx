@@ -142,6 +142,20 @@ describe('DashboardPage summary row', () => {
     expect(screen.getByText(/^The daily Tavily credit budget has been reached\./)).toBeInTheDocument()
   })
 
+  it('lays out the dashboard as sections on the page, with the figures in one strip instead of cards', async () => {
+    ;({ fake } = setup())
+    const label = await screen.findByText('Answers checked in the last 24 hours')
+    expect(label.tagName).toBe('DT')
+    const strip = label.closest('dl')
+    expect(strip).not.toBeNull()
+    expect(strip!.querySelectorAll('.rounded-xl')).toHaveLength(0)
+    for (const name of ['Claim rates by model and topic', 'Live verification feed']) {
+      const section = screen.getByRole('region', { name })
+      expect(section).not.toHaveClass('rounded-xl')
+      expect(section).not.toHaveClass('bg-surface-2')
+    }
+  })
+
   it('draws the summary cards without a pointer spotlight', async () => {
     ;({ fake } = setup())
     const label = await screen.findByText('Answers checked in the last 24 hours')

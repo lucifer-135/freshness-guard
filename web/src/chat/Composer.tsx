@@ -65,7 +65,7 @@ export function Composer({ busy, onSend }: ComposerProps) {
   }
 
   return (
-    <form onSubmit={submit} className="space-y-2 rounded-xl border border-border-strong bg-surface-2 p-3">
+    <form onSubmit={submit} className="space-y-2 rounded-lg border border-border-strong bg-surface-2 p-3">
       <Label htmlFor={messageId} className="sr-only">
         Message
       </Label>

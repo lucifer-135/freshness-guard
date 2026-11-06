@@ -111,7 +111,7 @@ export function ExplainCard({ claim, report }: { claim: Claim; report: Report })
               {claim.evidence.map((e, i) => {
                 const href = safeHref(e.url)
                 return (
-                  <li key={e.ref || i} className="rounded-md border border-border bg-surface-2 p-2">
+                  <li key={e.ref || i} className="border-l border-border pl-3">
                     <p className="font-medium [overflow-wrap:anywhere]">
                       {href ? (
                         <a href={href} target="_blank" rel="noopener noreferrer" className="text-link underline underline-offset-4 hover:text-link-strong">

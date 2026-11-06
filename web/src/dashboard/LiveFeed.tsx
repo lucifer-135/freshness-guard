@@ -29,7 +29,7 @@ export function LiveFeed() {
   const waiting = frozen ? latest.filter((r) => !frozen.some((f) => f.id === r.id)).length : 0
 
   return (
-    <section aria-labelledby="live-feed-title" className="@container flex h-full flex-col gap-3 rounded-xl lg:absolute lg:inset-0 border border-border bg-surface-2 p-4">
+    <section aria-labelledby="live-feed-title" className="@container flex h-full flex-col gap-3 lg:absolute lg:inset-0">
       <div className="flex items-center justify-between gap-3">
         <h2 id="live-feed-title" className="text-lg font-semibold">
           Live verification feed
