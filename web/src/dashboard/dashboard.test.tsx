@@ -105,6 +105,28 @@ describe('DashboardPage summary row', () => {
     expect(await card('Cached answers removed in the last 24 hours')).toHaveTextContent('1')
   })
 
+  it('writes card labels in sentence case, not as eyebrows', async () => {
+    ;({ fake } = setup())
+    const label = await screen.findByText('Answers checked in the last 24 hours')
+    expect(label).not.toHaveClass('eyebrow')
+    expect(label.nextElementSibling).not.toHaveClass('font-mono')
+  })
+
+  it('shows credit use as a meter', async () => {
+    ;({ fake } = setup())
+    const meter = await screen.findByRole('meter', { name: 'Tavily credits used today' })
+    expect(meter).toHaveAttribute('aria-valuenow', '4')
+    expect(meter).toHaveAttribute('aria-valuemin', '0')
+    expect(meter).toHaveAttribute('aria-valuemax', '200')
+  })
+
+  it('shows an empty meter when the budget is 0', async () => {
+    ;({ fake } = setup({ 'GET /freshness/summary': () => json(200, { ...summary, credits: { used: 0, budget: 0 } }) }))
+    const meter = await screen.findByRole('meter', { name: 'Tavily credits used today' })
+    expect(meter).toHaveAttribute('aria-valuemax', '0')
+    expect((meter.firstElementChild as HTMLElement).style.width).toBe('0%')
+  })
+
   it('says when the cache purge is switched off', async () => {
     ;({ fake } = setup({ 'GET /freshness/summary': () => json(200, { ...summary, cache_purge_enabled: false }) }))
     expect(await screen.findByText('Cache purge is switched off.')).toBeInTheDocument()
