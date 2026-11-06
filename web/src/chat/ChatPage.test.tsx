@@ -56,11 +56,11 @@ function chatBody(fake: FakeFetch): Record<string, unknown> {
   return JSON.parse(req?.body ?? '{}') as Record<string, unknown>
 }
 
-// The claim inspector sits beside the chat from 1280px; below that it is a sheet.
+// The claim inspector sits beside the chat from 80rem (Tailwind xl, 1280px at the default font size); below that it is a sheet.
 const realMatchMedia = window.matchMedia
 function setScreenWide(wide: boolean) {
   window.matchMedia = (query: string) =>
-    ({ ...realMatchMedia(query), matches: wide && query.includes('min-width: 1280px') }) as MediaQueryList
+    ({ ...realMatchMedia(query), matches: wide && query.includes('min-width: 80rem') }) as MediaQueryList
 }
 
 describe('ChatPage', () => {
@@ -100,6 +100,14 @@ describe('ChatPage', () => {
     expect(screen.getByText('The answer waits up to 8 seconds while its claims are checked.')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('radio', { name: 'Off' }))
     expect(screen.getByText('This answer will not be checked.')).toBeInTheDocument()
+  })
+
+  it('publishes the docked composer height so scrolling keeps focused elements clear of it', async () => {
+    fake = setup(streamedAnswer)
+    await screen.findByLabelText('Message')
+    expect(document.documentElement.style.getPropertyValue('--composer-inset')).toMatch(/^\d+px$/)
+    await userEvent.click(screen.getByRole('radio', { name: 'Check any answer' }))
+    expect(document.documentElement.style.getPropertyValue('--composer-inset')).toBe('')
   })
 
   it('keeps the page heading for screen readers only', async () => {
@@ -153,6 +161,12 @@ describe('ChatPage', () => {
     fake = setup(streamedAnswer, completeReport({ status: 'error', reason: 'The judge model did not respond.' }))
     await send()
     expect((await screen.findAllByText('The claims could not be checked.', {}, { timeout: 3000 })).length).toBeGreaterThan(0)
+    // A failed check has no verdicts to count, and the working loader is gone.
+    expect(screen.queryByRole('list', { name: 'Verdict summary' })).toBeNull()
+    expect(screen.queryByText('Checking claims')).toBeNull()
+    // The long sentence is shown once as text; the one-line loader never carries it, so it cannot overflow a narrow screen.
+    const sentence = 'The freshness check could not finish. The judge model did not respond.'
+    for (const el of screen.getAllByText(sentence)) expect(el.closest('[aria-hidden="true"]')).toBeNull()
   })
 
   it('explains a blocked answer and links its report', async () => {
@@ -288,6 +302,51 @@ describe('ChatPage', () => {
     expect(rows[0]).toHaveAttribute('aria-expanded', 'true')
     expect(within(inspector).getByText('Current value: $25 per month')).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('collapses an expanded claim when its row is chosen again', async () => {
+    setScreenWide(true)
+    fake = setup(streamedAnswer, completeReport())
+    await send()
+    await screen.findByText('2 claims checked. 1 claim is outdated.', {}, { timeout: 3000 })
+    const inspector = screen.getByRole('complementary', { name: 'Claims in this answer' })
+    const row = within(inspector).getAllByRole('button')[0]
+    await userEvent.click(row)
+    expect(row).toHaveAttribute('aria-expanded', 'true')
+    await userEvent.click(row)
+    expect(row).toHaveAttribute('aria-expanded', 'false')
+    expect(within(inspector).queryByText('Why this claim was checked')).toBeNull()
+  })
+
+  it('does not carry a selected claim over to the next answer', async () => {
+    setScreenWide(true)
+    let n = 0
+    const twoAnswers: Route = () => {
+      n++
+      return new Response(streamBody([chunk(answer), 'data: [DONE]\n\n']), {
+        headers: { 'Content-Type': 'text/event-stream', 'X-Freshness-Report-Id': `r${n}`, 'X-Freshness-Status': 'pending' },
+      })
+    }
+    fake = setup(twoAnswers, completeReport())
+    fake.restore()
+    fake = fakeFetch({
+      'GET /freshness/status': () => status.clone(),
+      'GET /freshness/models': () => json(200, { models: [{ id: 'openai/fake-model', provider: 'openai' }] }),
+      'GET /freshness/events': () => new Response(new ReadableStream({ start() {} }), { headers: { 'Content-Type': 'text/event-stream' } }),
+      'POST /freshness/chat': twoAnswers,
+      'GET /freshness/reports/r1': () => json(200, completeReport({ id: 'r1' })),
+      'GET /freshness/reports/r2': () => json(200, completeReport({ id: 'r2' })),
+    })
+    await send('first')
+    await screen.findAllByText('2 claims checked. 1 claim is outdated.', {}, { timeout: 3000 })
+    const inspector = () => screen.getByRole('complementary', { name: 'Claims in this answer' })
+    await userEvent.click(within(inspector()).getAllByRole('button')[0])
+    expect(within(inspector()).getAllByRole('button')[0]).toHaveAttribute('aria-expanded', 'true')
+    await send('second')
+    await waitFor(() => expect(screen.getAllByText('2 claims checked. 1 claim is outdated.')).toHaveLength(2), { timeout: 3000 })
+    // Claim IDs repeat across reports (c1, c2, ...), so the new answer's first claim must not open on its own.
+    await waitFor(() => expect(within(inspector()).getAllByRole('button')[0]).toHaveAttribute('aria-expanded', 'false'))
+    expect(within(inspector()).queryByText('Why this claim was checked')).toBeNull()
   })
 
   it('shows a short preview when a claim is hovered', async () => {

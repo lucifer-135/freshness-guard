@@ -3,7 +3,7 @@
  * Copyright (c) 2026 David Haz. Licensed under MIT + Commons Clause; the full
  * licence is in web/public/react-bits-license.md. This file is not under the
  * Apache License 2.0 that covers the rest of Freshness Guard.
- * Changes: default colours are design tokens, not hex; the pointer-capture catch block has a comment, to satisfy no-empty.
+ * Changes: options also commit on a plain click event (assistive technology sends no pointer events); no outline utilities on the options, so the global 2px accent :focus-visible ring (DESIGN.md section 9) is drawn; default colours are design tokens, not hex; the pointer-capture catch block has a comment, to satisfy no-empty.
  */
 
 import React, { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
@@ -388,9 +388,15 @@ const RubberSegment: React.FC<RubberSegmentProps> = ({
           aria-checked={i === index}
           tabIndex={i === index ? 0 : -1}
           disabled={disabled}
-          className="inline-flex h-[calc(var(--rs-h)-var(--rs-inset)*2)] min-w-[var(--rs-min)] items-center justify-center gap-1.5 m-0 border-0 bg-transparent px-[var(--rs-pad)] py-0 rounded-[var(--rs-thumb-radius)] [font:inherit] text-[length:var(--rs-font)] font-medium leading-none whitespace-nowrap outline-none [transition:opacity_160ms_ease,transform_160ms_var(--rs-ease-out)] motion-reduce:[transition:opacity_160ms_ease] cursor-pointer [color:var(--rs-ink)] opacity-70 aria-checked:cursor-default group-data-[draggable]:aria-checked:cursor-grab group-data-[held]:cursor-grabbing data-[pressed]:[transform:scale(0.96)] focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:[outline-color:var(--rs-thumb)] [@media(hover:hover)_and_(pointer:fine)]:[&[aria-checked=false]:hover]:opacity-90"
+          className="inline-flex h-[calc(var(--rs-h)-var(--rs-inset)*2)] min-w-[var(--rs-min)] items-center justify-center gap-1.5 m-0 border-0 bg-transparent px-[var(--rs-pad)] py-0 rounded-[var(--rs-thumb-radius)] [font:inherit] text-[length:var(--rs-font)] font-medium leading-none whitespace-nowrap [transition:opacity_160ms_ease,transform_160ms_var(--rs-ease-out)] motion-reduce:[transition:opacity_160ms_ease] cursor-pointer [color:var(--rs-ink)] opacity-70 aria-checked:cursor-default group-data-[draggable]:aria-checked:cursor-grab group-data-[held]:cursor-grabbing data-[pressed]:[transform:scale(0.96)] [@media(hover:hover)_and_(pointer:fine)]:[&[aria-checked=false]:hover]:opacity-90"
           onPointerDown={e => handlePointerDown(e, i)}
           onKeyDown={handleKeyDown}
+          onClick={() => {
+            // Screen readers, voice control and switch access send a click without pointer events.
+            if (disabled || i === index) return;
+            commit(i);
+            jumpTo(i);
+          }}
         >
           {item.icon}
           {item.label}
@@ -404,7 +410,7 @@ const RubberSegment: React.FC<RubberSegmentProps> = ({
         {list.map(item => (
           <span
             key={item.value}
-            className="inline-flex h-[calc(var(--rs-h)-var(--rs-inset)*2)] min-w-[var(--rs-min)] items-center justify-center gap-1.5 m-0 border-0 bg-transparent px-[var(--rs-pad)] py-0 rounded-[var(--rs-thumb-radius)] [font:inherit] text-[length:var(--rs-font)] font-medium leading-none whitespace-nowrap outline-none [transition:opacity_160ms_ease,transform_160ms_var(--rs-ease-out)] motion-reduce:[transition:opacity_160ms_ease] cursor-default [color:inherit]"
+            className="inline-flex h-[calc(var(--rs-h)-var(--rs-inset)*2)] min-w-[var(--rs-min)] items-center justify-center gap-1.5 m-0 border-0 bg-transparent px-[var(--rs-pad)] py-0 rounded-[var(--rs-thumb-radius)] [font:inherit] text-[length:var(--rs-font)] font-medium leading-none whitespace-nowrap [transition:opacity_160ms_ease,transform_160ms_var(--rs-ease-out)] motion-reduce:[transition:opacity_160ms_ease] cursor-default [color:inherit]"
           >
             {item.icon}
             {item.label}

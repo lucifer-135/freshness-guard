@@ -19,7 +19,7 @@ export function Segmented<T extends string>({ label, value, options, onChange, s
       onChange={(next) => onChange(next as T)}
       trackColor="var(--surface-1)"
       thumbColor="var(--surface-3)"
-      textColor="var(--text-muted)"
+      textColor="var(--text)"
       activeTextColor="var(--text)"
       radius={8}
       size={size}

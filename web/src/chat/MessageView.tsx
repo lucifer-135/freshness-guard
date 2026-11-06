@@ -1,3 +1,4 @@
+import { CircleX } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
@@ -75,7 +76,8 @@ function AnswerView({
 
   const { provider, name } = splitModel(message.model)
   const notFound = report.error?.status === 404
-  const chips = report.data ? summaryChips(staggered.claims, staggered.reportStatus) : []
+  // A failed check has no verdicts to count, so it shows no chips.
+  const chips = report.data && staggered.reportStatus !== 'error' ? summaryChips(staggered.claims, staggered.reportStatus) : []
 
   return (
     <article className="space-y-3 rounded-xl border border-border bg-surface-1 p-4 shadow-[var(--highlight-top)]">
@@ -97,9 +99,10 @@ function AnswerView({
           )}
           {sentence && <p className="text-sm text-text-muted">{sentence}</p>}
           {staggered.reportStatus === 'error' && (
-            <div aria-hidden="true" className="mt-1 text-text-muted">
-              <LatticeLoader status="error" label={sentence ?? ''} errorLabel="The claims could not be checked." showTimer={false} color="var(--text-muted)" fontSize={13} />
-            </div>
+            <p className="mt-1 flex items-center gap-1.5 text-sm text-text">
+              <CircleX aria-hidden="true" className="size-4 text-status-outdated" />
+              The claims could not be checked.
+            </p>
           )}
         </div>
         {hasChanges(changes) && (

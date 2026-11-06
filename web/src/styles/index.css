@@ -114,6 +114,10 @@
 
   html {
     color-scheme: dark;
+    /* WCAG 2.4.11: keep a focused element clear of the sticky top bar (two rows
+       below 768px) and of the docked chat composer, whose height ChatPage sets. */
+    scroll-padding-top: 7rem;
+    scroll-padding-bottom: var(--composer-inset, 0px);
   }
 
   body {

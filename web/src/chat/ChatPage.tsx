@@ -1,5 +1,5 @@
 import { ListChecks } from 'lucide-react'
-import { useCallback, useState } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { ClaimInspector } from './ClaimInspector'
 import { Composer } from './Composer'
 import { MessageView } from './MessageView'
@@ -32,12 +32,35 @@ export function ChatPage() {
   )
 }
 
+// useComposerInset publishes the docked composer's height as --composer-inset
+// on the root element, where index.css turns it into scroll-padding-bottom, so
+// a focused element is never scrolled under the composer.
+function useComposerInset(ref: RefObject<HTMLElement | null>) {
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const root = document.documentElement
+    const update = () => root.style.setProperty('--composer-inset', `${el.offsetHeight}px`)
+    update()
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update)
+    observer?.observe(el)
+    return () => {
+      observer?.disconnect()
+      root.style.removeProperty('--composer-inset')
+    }
+  }, [ref])
+}
+
 function Conversation() {
   const { messages, busy, send } = useChat()
+  const composer = useRef<HTMLDivElement>(null)
+  useComposerInset(composer)
   const syncTimeoutMs = useStatus().data?.settings.sync_timeout_ms ?? 8000
-  // From 1280px the inspector sits beside the chat; below that it is a sheet.
-  const wide = useMediaQuery('(min-width: 1280px)')
-  const [selectedClaim, setSelectedClaim] = useState<string | null>(null)
+  // From Tailwind's xl breakpoint the inspector sits beside the chat; below it, it is a sheet.
+  // The query uses rem like the CSS, so both agree when the reader changes the browser's font size.
+  const wide = useMediaQuery('(min-width: 80rem)')
+  // Claim IDs repeat across reports (c1, c2, ...), so a selection belongs to one report.
+  const [selected, setSelected] = useState<{ reportId: string; claimId: string } | null>(null)
   const [announcement, setAnnouncement] = useState('')
   const [sheetOpen, setSheetOpen] = useState(false)
   const onStatus = useCallback((sentence: string) => setAnnouncement(sentence), [])
@@ -45,17 +68,28 @@ function Conversation() {
   const latest = [...messages].reverse().find((m): m is AssistantMessage => m.role === 'assistant' && m.reportId !== null)
   const report = useReport(latest?.reportId ?? null, { enabled: latest?.phase === 'done' && latest.mode !== 'off' })
 
-  // A row in the inspector opens that claim's details there and brings the claim into view in the answer.
+  const selectedClaim = selected && latest && selected.reportId === latest.reportId ? selected.claimId : null
+
+  function open(claimId: string) {
+    if (latest?.reportId) setSelected({ reportId: latest.reportId, claimId })
+  }
+
+  // A row in the inspector opens that claim's details there, or closes them when they are open,
+  // and brings the claim into view in the answer.
   function select(claimId: string) {
-    setSelectedClaim(claimId)
-    // Claim IDs repeat across reports (c1, c2, ...), so look only inside the latest answer.
+    if (selectedClaim === claimId) {
+      setSelected(null)
+      return
+    }
+    open(claimId)
+    // Look only inside the latest answer, because claim IDs repeat across reports.
     const scope = latest && document.querySelector(`[data-message-id="${CSS.escape(latest.id)}"]`)
     scope?.querySelector(`[data-claim-id="${CSS.escape(claimId)}"]`)?.scrollIntoView?.({ block: 'center' })
   }
 
   // "Show details" in a claim's preview, or a click on the claim, opens the details where the inspector is.
   function showDetails(claimId: string) {
-    setSelectedClaim(claimId)
+    open(claimId)
     if (!wide) setSheetOpen(true)
   }
 
@@ -102,7 +136,7 @@ function Conversation() {
             </Sheet>
           </div>
         )}
-        <div className="sticky bottom-0 z-10 bg-bg pt-2 pb-4">
+        <div ref={composer} className="sticky bottom-0 z-10 bg-bg pt-2 pb-4">
           <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-full h-8">
             <GradualBlur position="bottom" target="parent" height="2rem" strength={1.5} />
           </div>

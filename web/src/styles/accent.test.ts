@@ -56,3 +56,14 @@ test('status colours keep 3:1 contrast on the page background', () => {
     expect(contrast(tokens[name], tokens['--bg']), name).toBeGreaterThanOrEqual(3)
   }
 })
+
+// RubberSegment draws unselected labels at 70% opacity under the thumb overlay.
+test('segmented labels in the primary text colour keep 4.5:1 contrast at 70% opacity on the track', () => {
+  const blend = (fg: string, bg: string, alpha: number): string =>
+    '#' +
+    [1, 3, 5]
+      .map((i) => Math.round(parseInt(fg.slice(i, i + 2), 16) * alpha + parseInt(bg.slice(i, i + 2), 16) * (1 - alpha)).toString(16).padStart(2, '0'))
+      .join('')
+  const label = blend(tokens['--text'], tokens['--surface-1'], 0.7)
+  expect(contrast(label, tokens['--surface-1'])).toBeGreaterThanOrEqual(4.5)
+})
