@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { useId, useState } from 'react'
-import { ChoiceGroup } from './ChoiceGroup'
 import { byProvider, categoriesIn, cellSentence, heatmapSummary, isLowSample, rate } from './heatmap'
 import { getLeaderboard, type ApiError } from '@/api/client'
 import type { Category, Counts, Leaderboard, LeaderboardRow, Metric, StatsWindow } from '@/api/types'
 import { percent } from '@/claims/format'
+import { Segmented } from '@/components/Segmented'
 import { Button } from '@/components/ui/button'
 import { statsKey } from '@/live/keys'
 
@@ -68,12 +68,17 @@ function HeatmapGrid({ lb, metric, categories, active, onActive, describedBy }: 
           data-low-sample={low}
           data-active={active?.rowKey === rowKey && active.category === category}
           data-crosshair={crosshair}
-          style={{
-            backgroundColor: low
-              ? 'var(--surface-2)'
-              : `color-mix(in oklch, ${color} ${Math.round(rate(counts, metric) * MAX_MIX)}%, var(--surface-3))`,
-          }}
-          className="px-3 py-2 text-center font-mono tabular-nums data-[active=true]:ring-2 data-[active=true]:ring-primary data-[active=true]:ring-inset data-[crosshair=true]:brightness-125"
+          // oklab keeps the mix between rose and slate; oklch swung the hue through violet.
+          // Low-sample cells are hatched, so their uncertainty is visible as well as written.
+          style={
+            low
+              ? {
+                  backgroundColor: 'var(--surface-2)',
+                  backgroundImage: 'repeating-linear-gradient(135deg, var(--surface-2) 0 6px, var(--surface-3) 6px 12px)',
+                }
+              : { backgroundColor: `color-mix(in oklab, ${color} ${Math.round(rate(counts, metric) * MAX_MIX)}%, var(--surface-3))` }
+          }
+          className="px-3 py-2 text-center font-mono tabular-nums data-[active=true]:ring-2 data-[active=true]:ring-[var(--accent)] data-[active=true]:ring-inset data-[crosshair=true]:brightness-125"
           onPointerEnter={() => onActive({ rowKey, category, sentence })}
           onPointerLeave={() => onActive(null)}
           onFocus={() => onActive({ rowKey, category, sentence })}
@@ -111,8 +116,8 @@ function HeatmapGrid({ lb, metric, categories, active, onActive, describedBy }: 
             const groupKey = `provider:${group.provider}`
             return [
               <tr key={groupKey} className="border-t border-border-strong bg-surface-1 font-semibold">
-                <th scope="row" data-crosshair={active?.rowKey === groupKey} className="px-3 py-2 text-left data-[crosshair=true]:text-primary">
-                  {group.provider}
+                <th scope="row" data-crosshair={active?.rowKey === groupKey} className="px-3 py-2 text-left data-[crosshair=true]:text-text">
+                  {`All ${group.provider} models`}
                 </th>
                 {cells(groupKey, group.rows)}
               </tr>,
@@ -121,7 +126,7 @@ function HeatmapGrid({ lb, metric, categories, active, onActive, describedBy }: 
                   <th
                     scope="row"
                     data-crosshair={active?.rowKey === row.model}
-                    className="px-3 py-2 text-left font-mono text-xs font-normal data-[crosshair=true]:text-primary"
+                    className="px-3 py-2 text-left font-mono text-xs font-normal data-[crosshair=true]:text-text"
                   >
                     {row.model}
                   </th>
@@ -191,9 +196,9 @@ export function StalenessHeatmap() {
       <h2 id={`${summaryId}-title`} className="text-lg font-semibold">
         Claim rates by model and topic
       </h2>
-      <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
-        <ChoiceGroup legend="Show the rate of" value={metric} options={metricOptions} onChange={setMetric} />
-        <ChoiceGroup legend="Time window" value={period} options={windowOptions} onChange={setPeriod} />
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <Segmented label="Show the rate of" value={metric} options={metricOptions} onChange={setMetric} />
+        <Segmented label="Time window" value={period} options={windowOptions} onChange={setPeriod} />
         <Button variant="secondary" aria-pressed={asTable} onClick={() => setAsTable((v) => !v)}>
           {asTable ? 'View as heatmap' : 'View as table'}
         </Button>

@@ -127,9 +127,9 @@ describe('DashboardPage heatmap', () => {
     const headers = within(table).getAllByRole('columnheader').map((h) => h.textContent)
     expect(headers).toEqual(['Model', 'pricing', 'law'])
     expect(within(table).getAllByRole('rowheader').map((h) => h.textContent)).toEqual([
-      'gemini',
+      'All gemini models',
       'gemini/gemini-3.5-flash',
-      'groq',
+      'All groq models',
       'groq/openai/gpt-oss-20b',
       'groq/openai/gpt-oss-120b',
     ])
@@ -150,6 +150,27 @@ describe('DashboardPage heatmap', () => {
     }
     expect(screen.getAllByText('No data').length).toBeGreaterThan(0)
     expect(screen.getByLabelText(pricingSentence)).not.toHaveAttribute('data-low-sample', 'true')
+  })
+
+  it('colours cells in oklab so a high rate never turns violet', async () => {
+    ;({ fake } = setup())
+    const cell = await screen.findByLabelText(pricingSentence)
+    expect(cell.style.backgroundColor).toContain('in oklab')
+    expect(cell.style.backgroundColor).not.toContain('in oklch')
+  })
+
+  it('hatches low-sample cells', async () => {
+    ;({ fake } = setup())
+    for (const cell of await screen.findAllByLabelText(lawSentence)) {
+      expect(cell.style.backgroundImage).toContain('repeating-linear-gradient')
+    }
+  })
+
+  it('uses segmented controls for the rate and the time window', async () => {
+    ;({ fake } = setup())
+    await screen.findByLabelText(pricingSentence)
+    expect(screen.getByRole('radiogroup', { name: 'Show the rate of' })).toBeInTheDocument()
+    expect(screen.getByRole('radiogroup', { name: 'Time window' })).toBeInTheDocument()
   })
 
   it('switches between the outdated and the incorrect rate', async () => {
