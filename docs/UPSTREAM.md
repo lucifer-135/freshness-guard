@@ -57,7 +57,7 @@ The following describes the plan. Nothing has been sent to the Bifrost maintaine
 Readiness checklist:
 
 - [x] Unit tests, end-to-end tests and web tests exist and pass locally (see the README for the last results).
-- [x] A continuous integration workflow exists (`.github/workflows/ci.yml`). It has not run yet because the repository has not been pushed with it.
+- [x] A continuous integration workflow exists (`.github/workflows/ci.yml`). It runs on every push to `main`; its first run on 6 November 2026 passed.
 - [ ] The code is under the Apache License 2.0, the licence of Bifrost (`LICENSE`, `NOTICE`), except for four React Bits components in `web/src/components/reactbits/` (MIT + Commons Clause), which must be replaced first.
 - [x] No breaking change: the plugin adds behaviour only when it is configured, and each hook returns the response unchanged on any error.
 - [ ] The contribution guide of the Bifrost repository has been read and followed.

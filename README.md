@@ -24,7 +24,7 @@ Public extension points. The plugin uses four Bifrost plugin hooks, the `pre_bui
 
 A reproducible integration with a standard Bifrost installation. The plugin is built as a Go plugin (`.so`) against Bifrost `transports/v2.4.0`. A Go plugin only loads when it is built with the same Go version and the same version of every shared module as the Bifrost binary, and the official Bifrost image is statically linked and cannot load plugins. `deploy/Dockerfile` therefore builds Bifrost from source the way its documentation builds the dynamic binary, builds the plugin with the same toolchain, and runs `deploy/check-shared-versions.sh`, which stops the build when a shared module differs. The quick start below needs Docker and one command after the setup.
 
-Tests, documentation and upstream readiness. The repository has unit, end-to-end and browser tests (see Evaluation), a continuous integration workflow (`.github/workflows/ci.yml`), the Apache License 2.0, and an upstream plan with a readiness checklist in [docs/UPSTREAM.md](docs/UPSTREAM.md). The workflow has not run yet, because the repository has not been pushed with it.
+Tests, documentation and upstream readiness. The repository has unit, end-to-end and browser tests (see Evaluation), a continuous integration workflow (`.github/workflows/ci.yml`), the Apache License 2.0, and an upstream plan with a readiness checklist in [docs/UPSTREAM.md](docs/UPSTREAM.md). The workflow runs on every push to `main`, and its first run on 6 November 2026 passed.
 
 ## How it meets Tavily 06
 
