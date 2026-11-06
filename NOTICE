@@ -4,8 +4,8 @@ Copyright 2026 Shivansh Gautam
 Freshness Guard is a plugin for Bifrost (https://github.com/maximhq/bifrost),
 which is licensed under the Apache License 2.0.
 
-The web application contains four components copied from React Bits
-(https://reactbits.dev): RubberSegment.tsx, StatusMark.tsx, LatticeLoader.tsx
-and GradualBlur.tsx in web/src/components/reactbits/. Copyright (c) 2026
+The web application contains three components copied from React Bits
+(https://reactbits.dev): RubberSegment.tsx, StatusMark.tsx and LatticeLoader.tsx
+in web/src/components/reactbits/. Copyright (c) 2026
 David Haz. They are licensed under MIT + Commons Clause, not under the Apache
 License 2.0; the full licence is in web/public/react-bits-license.md.

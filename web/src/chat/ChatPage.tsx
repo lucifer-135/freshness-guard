@@ -7,7 +7,6 @@ import { useChat } from './ChatProvider'
 import type { AssistantMessage } from './useChat'
 import { CheckPanel } from '@/check/CheckPanel'
 import { Button } from '@/components/ui/button'
-import GradualBlur from '@/components/reactbits/GradualBlur'
 import { Segmented } from '@/components/Segmented'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { useMediaQuery } from '@/lib/useMediaQuery'
@@ -137,9 +136,6 @@ function Conversation() {
           </div>
         )}
         <div ref={composer} className="sticky bottom-0 z-10 bg-bg pt-2 pb-4">
-          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-full h-8">
-            <GradualBlur position="bottom" target="parent" height="2rem" strength={1.5} />
-          </div>
           <Composer busy={busy} onSend={send} />
         </div>
       </div>
