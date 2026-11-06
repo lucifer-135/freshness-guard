@@ -4,7 +4,6 @@ import { getSummary, type ApiError } from '@/api/client'
 import type { Summary } from '@/api/types'
 import { percent } from '@/claims/format'
 import { statsKey } from '@/live/keys'
-import { SpotlightCard } from '@/motion/SpotlightCard'
 import { Button } from '@/components/ui/button'
 
 const BUDGET_REACHED =
@@ -46,14 +45,14 @@ function Stat({
 }) {
   const labelId = useId()
   return (
-    <SpotlightCard>
+    <div className="rounded-xl border border-border bg-surface-1 p-4">
       <p id={labelId} className="text-sm text-text-muted">
         {label}
       </p>
       <p className="mt-1 text-3xl font-semibold tabular-nums">{value}</p>
       {meter && <Meter labelledBy={labelId} used={meter.used} budget={meter.budget} />}
       <p className="mt-1 min-h-5 text-sm text-text-muted">{detail}</p>
-    </SpotlightCard>
+    </div>
   )
 }
 

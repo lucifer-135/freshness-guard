@@ -1,12 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { DashboardPage } from './DashboardPage'
 import { setToken } from '@/api/client'
 import { feedKey } from '@/live/keys'
-import { SpotlightCard } from '@/motion/SpotlightCard'
 import { fakeFetch, json, type FakeFetch, type Route as FakeRoute } from '@/test/fakeFetch'
 import { completeReport } from '@/test/fixtures'
 
@@ -141,6 +140,12 @@ describe('DashboardPage summary row', () => {
     expect((meter.firstElementChild as HTMLElement).style.width).toBe('0%')
     // With no budget no claim can be checked, so the card says why.
     expect(screen.getByText(/^The daily Tavily credit budget has been reached\./)).toBeInTheDocument()
+  })
+
+  it('draws the summary cards without a pointer spotlight', async () => {
+    ;({ fake } = setup())
+    const label = await screen.findByText('Answers checked in the last 24 hours')
+    expect(label.closest('.spotlight-card')).toBeNull()
   })
 
   it('says when the cache purge is switched off', async () => {
@@ -381,22 +386,3 @@ describe('DashboardPage live feed', () => {
   })
 })
 
-describe('SpotlightCard', () => {
-  it('lights up under a fine pointer', () => {
-    matchMediaWith(() => false)
-    render(<SpotlightCard>content</SpotlightCard>)
-    const card = screen.getByText('content')
-    fireEvent.pointerEnter(card)
-    expect(card.style.getPropertyValue('--spot')).toBe('1')
-    fireEvent.pointerLeave(card)
-    expect(card.style.getPropertyValue('--spot')).toBe('0')
-  })
-
-  it('does nothing with reduced motion or a touch pointer', () => {
-    matchMediaWith(() => true)
-    render(<SpotlightCard>content</SpotlightCard>)
-    const card = screen.getByText('content')
-    fireEvent.pointerEnter(card)
-    expect(card.style.getPropertyValue('--spot')).toBe('')
-  })
-})

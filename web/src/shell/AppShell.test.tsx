@@ -50,6 +50,12 @@ describe('AppShell', () => {
     }
   })
 
+  it('draws no ambient background', () => {
+    fake = fakeFetch({ 'GET /freshness/status': () => status(true, 9), 'GET /freshness/events': endedStream })
+    renderAt('/chat')
+    expect(document.querySelector('canvas')).toBeNull()
+  })
+
   it('draws no cursor aura', () => {
     fake = fakeFetch({ 'GET /freshness/status': () => status(true, 9), 'GET /freshness/events': endedStream })
     renderAt('/chat')

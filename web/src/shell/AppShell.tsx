@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { Outlet, useLocation } from 'react-router'
 import { ChatProvider } from '@/chat/ChatProvider'
-import { SignalField } from '@/motion/SignalField'
 import { TopBar } from './TopBar'
 
 export function AppShell() {
@@ -26,7 +25,6 @@ export function AppShell() {
       >
         Skip to main content
       </a>
-      <SignalField />
       <TopBar />
       <main id="main" ref={main} tabIndex={-1} className="min-w-0 flex-1 p-4 outline-none lg:p-6">
         <ChatProvider>
