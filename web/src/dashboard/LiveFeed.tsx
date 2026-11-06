@@ -58,13 +58,15 @@ export function LiveFeed() {
               animate={reduced ? { opacity: 1 } : { opacity: 1, y: 0 }}
               transition={{ duration: reduced ? 0.08 : 0.22 }}
             >
-              <Link to={`/reports/${r.id}`} className="flex h-10 items-center gap-3 px-3 text-sm hover:bg-surface-3">
+              <Link to={`/reports/${r.id}`} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-3 py-2 text-sm hover:bg-surface-3 sm:h-10 sm:flex-nowrap sm:py-0">
                 <ScoreRing score={r.score} size="sm" />
-                <span className="min-w-0 flex-1 truncate font-mono text-xs">{r.model || 'Pasted text'}</span>
+                <span className="min-w-0 flex-1 truncate font-mono text-xs" title={r.model || undefined}>
+                  {r.model || 'Pasted text'}
+                </span>
                 <span className="shrink-0 text-text-muted">
                   {r.status === 'complete' ? `${r.stale_count} outdated` : statusLabel[r.status]}
                 </span>
-                <time dateTime={r.created_at} className="shrink-0 text-xs text-text-muted tabular-nums">
+                <time dateTime={r.created_at} className="w-full shrink-0 pl-10 text-xs text-text-muted tabular-nums sm:w-auto sm:pl-0">
                   {formatDateTime(r.created_at)}
                 </time>
               </Link>
