@@ -6,9 +6,9 @@ import { useReducedMotion } from '@/motion/useReducedMotion'
 // (bench/curated.json), with the verdicts and values recorded there.
 const notes = [
   { tone: 'outdated', label: 'Outdated', value: 'Now $14.99, since 28 August 2026 · apple.com' },
-  { tone: 'current', label: 'Current', value: 'Confirmed by live sources' },
+  { tone: 'current', label: 'Current', value: 'Confirmed by live sources', prose: true },
   { tone: 'outdated', label: 'Outdated', value: 'Now $22.99, since 21 April 2026 · news.xbox.com' },
-] as const
+] as { tone: 'outdated' | 'current'; label: string; value: string; prose?: boolean }[]
 
 function Answer({ marked }: { marked: boolean }) {
   const claim = (tone: 'outdated' | 'current', text: string) => (marked ? <span className={`claim-${tone}`}>{text}</span> : text)
@@ -22,7 +22,7 @@ function Answer({ marked }: { marked: boolean }) {
         {notes.map((n, i) => (
           <li key={i} className="text-sm">
             <span className={n.tone === 'outdated' ? 'font-medium text-status-outdated' : 'font-medium text-status-current'}>{n.label}</span>
-            <span className="block font-mono text-xs text-text-muted">{n.value}</span>
+            <span className={`block text-xs text-text-muted ${n.prose ? '' : 'font-mono'}`}>{n.value}</span>
           </li>
         ))}
       </ol>
@@ -94,10 +94,11 @@ export function ScanAnswer() {
       onPointerUp={() => (dragging.current = false)}
       onPointerCancel={() => (dragging.current = false)}
     >
-      <div aria-hidden="true">
+      {/* The text stops short of the right edge, so the line at rest never crosses a letter. */}
+      <div aria-hidden="true" className="pr-12">
         <Answer marked={false} />
       </div>
-      <div className="absolute inset-0" style={{ clipPath: 'inset(-1rem calc(100% - var(--scan)) -1rem 0)' }}>
+      <div className="absolute inset-0 pr-12" style={{ clipPath: 'inset(-1rem calc(100% - var(--scan)) -1rem 0)' }}>
         <Answer marked />
       </div>
       <div

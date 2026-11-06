@@ -3,10 +3,13 @@ import { Link } from 'react-router'
 import { listReports, type ApiError } from '@/api/client'
 import type { Report, ReportStatus } from '@/api/types'
 import { formatDateTime } from '@/claims/format'
-import { ScoreRing } from '@/claims/ScoreRing'
+import { ScoreFigure } from '@/claims/ScoreRing'
 import { modeLabel } from '@/chat/modes'
 
 const statusLabel: Record<ReportStatus, string> = { pending: 'Checking', complete: 'Complete', error: 'Failed' }
+
+// Mode and status are details; on a phone the time, model and figures come first.
+const narrowHidden = new Set(['Mode', 'Status'])
 
 export function ReportsPage() {
   const reports = useQuery<Report[], ApiError>({ queryKey: ['reports'], queryFn: () => listReports({ limit: 50 }) })
@@ -28,7 +31,7 @@ export function ReportsPage() {
             <thead className="text-text-muted">
               <tr>
                 {['Time', 'Model', 'Mode', 'Status', 'Score', 'Outdated', 'Checked'].map((h) => (
-                  <th key={h} scope="col" className="px-3 py-2 font-medium">
+                  <th key={h} scope="col" className={`px-3 py-2 font-medium ${narrowHidden.has(h) ? 'hidden sm:table-cell' : ''}`}>
                     {h}
                   </th>
                 ))}
@@ -36,17 +39,18 @@ export function ReportsPage() {
             </thead>
             <tbody>
               {reports.data.map((r) => (
-                <tr key={r.id} className="border-t border-border hover:bg-surface-1">
+                // The whole row opens the report: the date link is stretched over the row.
+                <tr key={r.id} className="relative border-t border-border hover:bg-surface-1">
                   <td className="px-3 py-2">
-                    <Link to={`/reports/${r.id}`} className="text-link underline underline-offset-4 hover:text-link-strong">
+                    <Link to={`/reports/${r.id}`} className="font-medium text-text after:absolute after:inset-0 hover:text-link-strong">
                       {formatDateTime(r.created_at) || r.id}
                     </Link>
                   </td>
                   <td className="px-3 py-2 font-mono text-xs">{r.model || 'Pasted text'}</td>
-                  <td className="px-3 py-2">{modeLabel(r.mode)}</td>
-                  <td className="px-3 py-2">{statusLabel[r.status]}</td>
+                  <td className="hidden px-3 py-2 sm:table-cell">{modeLabel(r.mode)}</td>
+                  <td className="hidden px-3 py-2 sm:table-cell">{statusLabel[r.status]}</td>
                   <td className="px-3 py-2">
-                    <ScoreRing score={r.score} size="sm" />
+                    <ScoreFigure score={r.score} />
                   </td>
                   <td className="px-3 py-2 font-mono tabular-nums">{r.stale_count}</td>
                   <td className="px-3 py-2 font-mono tabular-nums">

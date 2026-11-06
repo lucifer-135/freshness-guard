@@ -1,5 +1,6 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query'
-import { LogOut, Radio, ShieldCheck } from 'lucide-react'
+import { LogOut, Radio } from 'lucide-react'
+import { Logo } from '@/brand/Logo'
 import { CreditMeter } from './CreditMeter'
 import { NavRail } from './NavRail'
 import { getStatus, type ApiError } from '@/api/client'
@@ -31,9 +32,8 @@ export function TopBar() {
 
   return (
     <header className="sticky top-0 z-10 flex flex-wrap items-center gap-x-4 gap-y-0 border-b border-border bg-surface-1 px-4">
-      <p className="flex items-center gap-2 py-3 font-semibold">
-        <ShieldCheck aria-hidden="true" className="size-5 text-text" />
-        Freshness Guard
+      <p className="py-3">
+        <Logo />
       </p>
       <NavRail className="order-last w-full md:order-none md:w-auto" />
       <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1 py-2">

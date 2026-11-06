@@ -84,7 +84,7 @@ export function ExplainCard({ claim, report }: { claim: Claim; report: Report })
       )}
 
       {claim.verdict === 'FRESH' && claim.score_parts && (
-        <ul className="space-y-0.5 font-mono text-xs tabular-nums text-text-muted">
+        <ul className="space-y-0.5 text-sm tabular-nums text-text-muted">
           <li>Evidence recency {percent(claim.score_parts.recency)}</li>
           <li>Source authority {percent(claim.score_parts.authority)}</li>
           <li>Agreement between sources {percent(claim.score_parts.agreement)}</li>
@@ -121,7 +121,7 @@ export function ExplainCard({ claim, report }: { claim: Claim; report: Report })
                         e.title || e.domain
                       )}
                     </p>
-                    <p className="font-mono text-xs text-text-subtle">
+                    <p className="text-xs text-text-subtle">
                       {e.domain}
                       {e.published_date && formatDate(e.published_date) && ` · Published ${formatDate(e.published_date)}`}
                       {e.authority === 1 && ' · Authoritative source'}
@@ -137,7 +137,7 @@ export function ExplainCard({ claim, report }: { claim: Claim; report: Report })
             <>
               <Eyebrow>Inference by the judge model</Eyebrow>
               <p className="text-text">{claim.rationale}</p>
-              <p className="font-mono text-xs tabular-nums text-text-muted">Judge confidence: {percent(claim.confidence)}</p>
+              <p className="text-sm tabular-nums text-text-muted">Judge confidence: {percent(claim.confidence)}</p>
               <p className="text-xs text-text-subtle">
                 This is the judge model's reasoning about the sources above. It is an inference, not a source.
               </p>

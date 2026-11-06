@@ -23,7 +23,8 @@ const sections: { value: Section; label: string }[] = [
 export function ChatPage() {
   const [section, setSection] = useState<Section>('chat')
   return (
-    <section className="space-y-4">
+    // The chat and the pasted-text check share one centred frame, so switching between them moves nothing.
+    <section className="mx-auto max-w-[1144px] space-y-4">
       <h1 className="sr-only">Freshness-checked chat</h1>
       <Segmented label="Page section" value={section} options={sections} onChange={setSection} />
       {section === 'chat' ? <Conversation /> : <CheckPanel />}

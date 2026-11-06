@@ -1,8 +1,8 @@
-import { ShieldCheck } from 'lucide-react'
 import { useId, useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Logo } from '@/brand/Logo'
 import { ScanAnswer } from './ScanAnswer'
 
 const repository = 'https://github.com/lucifer-135/freshness-guard'
@@ -19,9 +19,8 @@ export function HomePage({ notice, onConnect }: HomePageProps) {
   return (
     <div className="min-h-dvh bg-bg text-text">
       <header className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-6 gap-y-2 px-6 py-4 lg:px-12">
-        <p className="flex items-center gap-2 font-semibold">
-          <ShieldCheck aria-hidden="true" className="size-5" />
-          Freshness Guard
+        <p>
+          <Logo />
         </p>
         <p className="hidden text-sm text-text-subtle md:block">Plugin for the Bifrost LLM gateway</p>
         <nav aria-label="Page" className="ml-auto">
@@ -49,6 +48,7 @@ export function HomePage({ notice, onConnect }: HomePageProps) {
         <section aria-labelledby="home-title" className="pt-10 lg:pt-16">
           <p className="mb-8 max-w-[60ch] text-sm text-text-muted">
             An answer from a language model, checked as it leaves the gateway. The example is built from claims in the curated benchmark.
+            Drag the line, or focus it and use the arrow keys, to scan again.
           </p>
           <ScanAnswer />
           <div className="mt-14 grid gap-8 border-t border-border pt-8 lg:grid-cols-[1fr_minmax(0,26rem)] lg:gap-16">
@@ -68,15 +68,15 @@ export function HomePage({ notice, onConnect }: HomePageProps) {
             <li className="md:pr-8">
               <h3 className="font-medium">Find the claims</h3>
               <p className="mt-1 text-text-muted">
-                A model reads each answer, lists its factual claims, and estimates how likely each one is to have changed since the answering
-                model's knowledge was collected.
+                A model reads each answer, lists its factual claims, and estimates how likely each one is to have changed since the
+                answering model's knowledge was collected.
               </p>
             </li>
             <li className="md:px-8">
               <h3 className="font-medium">Check the likely changes</h3>
               <p className="mt-1 text-text-muted">
-                Those claims are searched on the live web with Tavily, and a judge model compares them with dated sources. Every verdict keeps
-                its evidence.
+                Those claims are searched on the live web with Tavily, and a judge model compares them with dated sources. Every verdict
+                keeps its evidence.
               </p>
             </li>
             <li className="md:pl-8">
@@ -89,10 +89,10 @@ export function HomePage({ notice, onConnect }: HomePageProps) {
           </ol>
           <div className="mt-10 grid gap-6 lg:grid-cols-[1fr_minmax(0,26rem)] lg:gap-16">
             <p className="max-w-[60ch] text-text-muted">
-              It runs inside Bifrost, so every application behind the gateway is checked without code changes. Two request headers choose when
-              to check and what to do with an outdated claim.
+              It runs inside Bifrost, so every application behind the gateway is checked without code changes. Two request headers choose
+              when to check and what to do with an outdated claim.
             </p>
-            <pre className="overflow-x-auto rounded-md border border-border bg-surface-1 p-4 font-mono text-sm leading-relaxed">
+            <pre className="border-y border-border py-4 font-mono text-sm leading-relaxed whitespace-pre-wrap">
               <code className="block">x-bf-freshness: async | sync | off</code>
               <code className="block">x-bf-freshness-policy: annotate | heal | block</code>
             </pre>
@@ -104,24 +104,26 @@ export function HomePage({ notice, onConnect }: HomePageProps) {
             What was measured
           </h2>
           <p className="mt-2 max-w-[70ch] text-text-muted">
-            A curated set of 51 claims about prices, versions, leadership and laws, 27 of them outdated, run on 5 November 2026 with free-tier
-            models. The labels were proposed with AI help and are not yet independently reviewed.
+            A curated set of 51 claims about prices, versions, leadership and laws, 27 of them outdated, run on 5 November 2026 with
+            free-tier models. The labels were proposed with AI help and are not yet independently reviewed.
           </p>
           <table className="mt-6 w-full max-w-2xl text-left">
             <caption className="sr-only">Benchmark results</caption>
             <tbody className="divide-y divide-border border-y border-border">
-              {[
-                ['Precision for outdated claims', '0.96'],
-                ['Recall for outdated claims', '0.96'],
-                ['Time to a verdict, median and 95th percentile', '4.2 s · 6.9 s'],
-                ['Tavily credits for the run', '53'],
-                ['Added reply latency in background mode, 99th percentile, test stack', 'within noise'],
-              ].map(([label, value]) => (
+              {(
+                [
+                  ['Precision for outdated claims', '0.96', true],
+                  ['Recall for outdated claims', '0.96', true],
+                  ['Time to a verdict, median and 95th percentile', '4.2 s · 6.9 s', true],
+                  ['Tavily credits for the run', '53', true],
+                  ['Added reply latency in background mode, 99th percentile, test stack', 'Within noise', false],
+                ] as const
+              ).map(([label, value, figure]) => (
                 <tr key={label}>
                   <th scope="row" className="py-3 pr-6 font-normal text-text-muted">
                     {label}
                   </th>
-                  <td className="py-3 text-right font-mono">{value}</td>
+                  <td className={`py-3 text-right ${figure ? 'font-mono tabular-nums' : ''}`}>{value}</td>
                 </tr>
               ))}
             </tbody>
@@ -129,12 +131,14 @@ export function HomePage({ notice, onConnect }: HomePageProps) {
         </section>
       </main>
 
-      <footer className="mx-auto mt-24 flex max-w-[1200px] flex-wrap gap-x-6 gap-y-2 border-t border-border px-6 py-6 text-sm text-text-subtle lg:px-12">
-        <p>Built for the Global AI Hackathon 2026 with Bifrost and Tavily.</p>
-        <p>Apache License 2.0</p>
-        <a href={repository} className="ml-auto text-link underline underline-offset-4 hover:text-link-strong">
-          Source code
-        </a>
+      <footer className="mx-auto mt-24 max-w-[1200px] px-6 lg:px-12">
+        <div className="flex flex-wrap gap-x-6 gap-y-2 border-t border-border py-6 text-sm text-text-subtle">
+          <p>Built for the Global AI Hackathon 2026 with Bifrost and Tavily.</p>
+          <p>Apache License 2.0</p>
+          <a href={repository} className="ml-auto text-link underline underline-offset-4 hover:text-link-strong">
+            Source code
+          </a>
+        </div>
       </footer>
     </div>
   )

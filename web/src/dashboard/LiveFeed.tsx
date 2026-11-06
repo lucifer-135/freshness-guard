@@ -6,7 +6,7 @@ import { Link } from 'react-router'
 import { listReports, type ApiError } from '@/api/client'
 import type { Report, ReportStatus } from '@/api/types'
 import { formatDateTime } from '@/claims/format'
-import { ScoreRing } from '@/claims/ScoreRing'
+import { ScoreFigure } from '@/claims/ScoreRing'
 import { Button } from '@/components/ui/button'
 import { feedKey } from '@/live/keys'
 import { useReducedMotion } from '@/motion/useReducedMotion'
@@ -16,6 +16,8 @@ const statusLabel: Record<ReportStatus, string> = { pending: 'Checking', complet
 // The feed shows the most recent 50 reports; that cap replaces virtualisation
 // (DESIGN.md section 10 asks for it only above 50 items).
 const FEED_LIMIT = 50
+// The feed shows whole rows only; the full list is one link away.
+const FEED_ROWS = 8
 
 // LiveFeed lists the newest reports. While it is paused it keeps the list it
 // had, so nothing moves under the reader, and it counts what is waiting.
@@ -53,9 +55,9 @@ export function LiveFeed() {
       {reports.data && shown.length === 0 && (
         <p className="text-text-muted">No answers have been checked yet. Send a message in the chat to see results here.</p>
       )}
-      <ol aria-label="Recent reports" className="min-h-0 divide-y divide-border overflow-y-auto rounded-lg border border-border bg-surface-1 empty:hidden">
+      <ol aria-label="Recent reports" className="min-h-0 shrink-0 divide-y divide-border overflow-y-auto rounded-lg border border-border bg-surface-1 empty:hidden">
         <AnimatePresence initial={false}>
-          {shown.map((r) => (
+          {shown.slice(0, FEED_ROWS).map((r) => (
             <motion.li
               key={r.id}
               initial={reduced ? { opacity: 0 } : { opacity: 0, y: -8 }}
@@ -63,7 +65,9 @@ export function LiveFeed() {
               transition={{ duration: reduced ? 0.08 : 0.22 }}
             >
               <Link to={`/reports/${r.id}`} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-3 py-2 text-sm hover:bg-surface-3 focus-visible:outline-offset-[-2px] @lg:h-10 @lg:flex-nowrap @lg:py-0">
-                <ScoreRing score={r.score} size="sm" />
+                <span className="w-7 shrink-0 text-right">
+                  <ScoreFigure score={r.score} />
+                </span>
                 <span className="min-w-0 flex-1 truncate font-mono text-xs" title={r.model || undefined}>
                   {r.model || 'Pasted text'}
                 </span>
@@ -78,6 +82,11 @@ export function LiveFeed() {
           ))}
         </AnimatePresence>
       </ol>
+      {shown.length > FEED_ROWS && (
+        <Link to="/reports" className="self-start text-sm text-link underline underline-offset-4 hover:text-link-strong">
+          Show all reports
+        </Link>
+      )}
     </section>
   )
 }

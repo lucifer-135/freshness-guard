@@ -367,6 +367,14 @@ describe('DashboardPage live feed', () => {
     for (const link of await within(list).findAllByRole('link')) expect(link).toHaveClass('focus-visible:outline-offset-[-2px]')
   })
 
+  it('shows the eight newest reports and links to the full list', async () => {
+    const many = Array.from({ length: 10 }, (_, i) => `r${i}`)
+    ;({ fake } = setup({ 'GET /freshness/reports': () => json(200, { reports: reports(...many) }) }))
+    const list = await screen.findByRole('list', { name: 'Recent reports' })
+    expect(await within(list).findAllByRole('link')).toHaveLength(8)
+    expect(screen.getByRole('link', { name: 'Show all reports' })).toHaveAttribute('href', '/freshness/ui/reports')
+  })
+
   it('freezes the feed while it is paused and keeps focus on the pause button', async () => {
     let list = reports('r1')
     const { queryClient, fake: f } = setup({ 'GET /freshness/reports': () => json(200, { reports: list }) })

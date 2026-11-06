@@ -327,6 +327,18 @@ describe('ChatPage', () => {
     }
   })
 
+  it('keeps the chat and the pasted-text check in one centred frame with their switch', async () => {
+    fake = setup(streamedAnswer, completeReport())
+    const frame = (await screen.findByRole('radiogroup', { name: 'Page section' })).closest('section')
+    expect(frame).toHaveClass('mx-auto', 'max-w-[1144px]')
+  })
+
+  it('draws one container around the composer, with borderless fields inside it', async () => {
+    fake = setup(streamedAnswer, completeReport())
+    const field = await screen.findByLabelText('Message')
+    expect(field).toHaveClass('border-0')
+  })
+
   it('centres the conversation and the inspector on wide screens', async () => {
     fake = setup(streamedAnswer, completeReport())
     await send()

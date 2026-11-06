@@ -39,3 +39,17 @@ export function ScoreRing({ score, size = 'md' }: { score: number | null; size?:
     </span>
   )
 }
+
+// ScoreFigure is the score as a figure tinted by its band, for lists and tables,
+// where a ring on every row would stand in for the number instead of showing it.
+export function ScoreFigure({ score }: { score: number | null }) {
+  return (
+    <span
+      className="font-mono tabular-nums"
+      style={{ color: score === null ? 'var(--text-subtle)' : bandColor(score) }}
+      aria-label={score === null ? 'No freshness score' : `Freshness score ${score} out of 100`}
+    >
+      {score ?? '–'}
+    </span>
+  )
+}

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { ReportPage } from './ReportPage'
@@ -38,6 +38,17 @@ describe('ReportsPage', () => {
     expect(fake.requests[0].url.searchParams.get('limit')).toBe('50')
     expect(screen.getAllByText('Background').length).toBeGreaterThan(0)
     expect(screen.getByRole('table').parentElement).not.toHaveClass('rounded-xl')
+  })
+
+  it('shows each score as a number, not a ring, and keeps the date link quiet', async () => {
+    fake = renderAt('/reports', { 'GET /freshness/reports': () => json(200, { reports: [completeReport()] }) })
+    const [link] = await screen.findAllByRole('link')
+    expect(link).not.toHaveClass('underline')
+    const row = link.closest('tr')!
+    expect(row.querySelector('svg')).toBeNull()
+    expect(within(row).getByLabelText(/^Freshness score \d+ out of 100$/)).toHaveClass('font-mono')
+    // Mode and status give way to the figures on narrow screens.
+    expect(screen.getByRole('columnheader', { name: 'Mode' })).toHaveClass('hidden', 'sm:table-cell')
   })
 
   it('explains an empty list', async () => {

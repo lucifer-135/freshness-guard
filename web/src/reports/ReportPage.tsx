@@ -34,7 +34,8 @@ export function ReportPage() {
   ]
 
   return (
-    <section className="space-y-6">
+    // One centred measure for the whole report, so its rules and the claim list share both edges.
+    <section className="mx-auto max-w-[880px] space-y-6">
       <header className="flex flex-wrap items-center gap-4">
         <ScoreRing score={r.status === 'complete' ? r.score : null} />
         <div>
@@ -86,7 +87,7 @@ export function ReportPage() {
           </h2>
           <ul className="divide-y divide-border">
             {byRisk(r.claims).map((c) => (
-              <li key={c.id} className="max-w-3xl py-6">
+              <li key={c.id} className="py-6">
                 <ExplainCard claim={c} report={r} />
               </li>
             ))}
