@@ -345,10 +345,12 @@ describe('DashboardPage live feed', () => {
     await screen.findAllByRole('link', { name: /openai\/fake-model/ })
     const pause = screen.getByRole('button', { name: 'Pause live feed' })
     await user.click(pause)
-    expect(pause).toHaveAttribute('aria-pressed', 'true')
+    // The button names what it does next, so the paused state is visible and announced.
+    expect(pause).toHaveAccessibleName('Resume live feed')
+    expect(pause).not.toHaveAttribute('aria-pressed')
     // The status line exists from the moment of pausing, so a new report never shifts the list.
     const region = screen.getByRole('status')
-    expect(region).toBeEmptyDOMElement()
+    expect(region).toHaveTextContent('The feed is paused. New reports will wait here.')
 
     list = reports('r2', 'r1')
     await act(() => queryClient.invalidateQueries({ queryKey: feedKey }))
@@ -359,7 +361,8 @@ describe('DashboardPage live feed', () => {
     expect(pause).toHaveFocus()
 
     await user.click(pause)
-    expect(pause).toHaveAttribute('aria-pressed', 'false')
+    expect(pause).toHaveAccessibleName('Pause live feed')
+    expect(screen.queryByRole('status')).toBeNull()
     expect(await screen.findAllByRole('link', { name: /openai\/fake-model/ })).toHaveLength(2)
   })
 

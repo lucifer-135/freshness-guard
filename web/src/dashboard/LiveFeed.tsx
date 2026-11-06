@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { Pause, Play } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useState } from 'react'
 import { Link } from 'react-router'
@@ -33,15 +34,18 @@ export function LiveFeed() {
         <h2 id="live-feed-title" className="text-lg font-semibold">
           Live verification feed
         </h2>
-        <Button variant="secondary" aria-pressed={frozen !== null} onClick={() => setFrozen(frozen ? null : latest)}>
-          Pause live feed
+        {/* The label names the next action, so a paused feed is visible at a glance
+            (a toggle with aria-pressed and a fixed label looked unchanged). */}
+        <Button variant="secondary" onClick={() => setFrozen(frozen ? null : latest)}>
+          {frozen ? <Play aria-hidden="true" /> : <Pause aria-hidden="true" />}
+          {frozen ? 'Resume live feed' : 'Pause live feed'}
         </Button>
       </div>
       {frozen && (
         // The line exists from the moment of pausing, so a new report changes its
         // text without moving the list, and the live region announces it.
         <p role="status" className="min-h-5 text-sm text-text-muted">
-          {waiting === 0 ? '' : waiting === 1 ? '1 new report is waiting.' : `${waiting} new reports are waiting.`}
+          {waiting === 0 ? 'The feed is paused. New reports will wait here.' : waiting === 1 ? '1 new report is waiting.' : `${waiting} new reports are waiting.`}
         </p>
       )}
       {reports.isPending && <p className="text-text-muted">Loading the reports.</p>}
