@@ -28,7 +28,7 @@ export function LiveFeed() {
   const waiting = frozen ? latest.filter((r) => !frozen.some((f) => f.id === r.id)).length : 0
 
   return (
-    <section aria-labelledby="live-feed-title" className="flex h-full flex-col gap-3 rounded-xl border border-border bg-surface-2 p-4">
+    <section aria-labelledby="live-feed-title" className="@container flex h-full flex-col gap-3 rounded-xl border border-border bg-surface-2 p-4">
       <div className="flex items-center justify-between gap-3">
         <h2 id="live-feed-title" className="text-lg font-semibold">
           Live verification feed
@@ -58,7 +58,7 @@ export function LiveFeed() {
               animate={reduced ? { opacity: 1 } : { opacity: 1, y: 0 }}
               transition={{ duration: reduced ? 0.08 : 0.22 }}
             >
-              <Link to={`/reports/${r.id}`} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-3 py-2 text-sm hover:bg-surface-3 sm:h-10 sm:flex-nowrap sm:py-0">
+              <Link to={`/reports/${r.id}`} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-3 py-2 text-sm hover:bg-surface-3 @lg:h-10 @lg:flex-nowrap @lg:py-0">
                 <ScoreRing score={r.score} size="sm" />
                 <span className="min-w-0 flex-1 truncate font-mono text-xs" title={r.model || undefined}>
                   {r.model || 'Pasted text'}
@@ -66,7 +66,7 @@ export function LiveFeed() {
                 <span className="shrink-0 text-text-muted">
                   {r.status === 'complete' ? `${r.stale_count} outdated` : statusLabel[r.status]}
                 </span>
-                <time dateTime={r.created_at} className="w-full shrink-0 pl-10 text-xs text-text-muted tabular-nums sm:w-auto sm:pl-0">
+                <time dateTime={r.created_at} className="w-full shrink-0 pl-10 text-xs text-text-muted tabular-nums @lg:w-auto @lg:pl-0">
                   {formatDateTime(r.created_at)}
                 </time>
               </Link>

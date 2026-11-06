@@ -118,6 +118,20 @@ describe('DashboardPage summary row', () => {
     expect(meter).toHaveAttribute('aria-valuenow', '4')
     expect(meter).toHaveAttribute('aria-valuemin', '0')
     expect(meter).toHaveAttribute('aria-valuemax', '200')
+    expect(meter).toHaveAttribute('aria-valuetext', '4 of 200')
+  })
+
+  it('caps the meter and says so when the credit budget is used up', async () => {
+    ;({ fake } = setup({ 'GET /freshness/summary': () => json(200, { ...summary, credits: { used: 35, budget: 30 } }) }))
+    const meter = await screen.findByRole('meter', { name: 'Tavily credits used today' })
+    expect(meter).toHaveAttribute('aria-valuenow', '30')
+    expect(meter).toHaveAttribute('aria-valuetext', '35 of 30')
+    expect((meter.firstElementChild as HTMLElement).style.width).toBe('100%')
+    expect(
+      screen.getByText(
+        'The daily Tavily credit budget has been reached. New claims will be checked again tomorrow, or you can raise the budget in the plugin settings.',
+      ),
+    ).toBeInTheDocument()
   })
 
   it('shows an empty meter when the budget is 0', async () => {
@@ -125,6 +139,8 @@ describe('DashboardPage summary row', () => {
     const meter = await screen.findByRole('meter', { name: 'Tavily credits used today' })
     expect(meter).toHaveAttribute('aria-valuemax', '0')
     expect((meter.firstElementChild as HTMLElement).style.width).toBe('0%')
+    // With no budget no claim can be checked, so the card says why.
+    expect(screen.getByText(/^The daily Tavily credit budget has been reached\./)).toBeInTheDocument()
   })
 
   it('says when the cache purge is switched off', async () => {
@@ -179,6 +195,13 @@ describe('DashboardPage heatmap', () => {
     const cell = await screen.findByLabelText(pricingSentence)
     expect(cell.style.backgroundColor).toContain('in oklab')
     expect(cell.style.backgroundColor).not.toContain('in oklch')
+  })
+
+  it('rings the focused cell in the primary text colour, which stays visible on a high-rate cell', async () => {
+    ;({ fake } = setup())
+    const cell = await screen.findByLabelText(pricingSentence)
+    expect(cell.className).toContain('data-[active=true]:ring-[var(--text)]')
+    expect(cell.className).not.toContain('ring-[var(--accent)]')
   })
 
   it('hatches low-sample cells', async () => {
@@ -284,6 +307,16 @@ describe('DashboardPage live feed', () => {
     const [link] = await within(await screen.findByRole('list', { name: 'Recent reports' })).findAllByRole('link')
     expect(link).toHaveTextContent('1 outdated')
     expect(link.querySelector('time')).toHaveAttribute('dateTime', completeReport().created_at)
+  })
+
+  it('lays out each row by the width of the feed, not of the window', async () => {
+    ;({ fake } = setup({ 'GET /freshness/reports': () => json(200, { reports: reports('r1') }) }))
+    const list = await screen.findByRole('list', { name: 'Recent reports' })
+    // The feed is a narrow column on wide screens, so the window width says nothing about the room a row has.
+    expect(list.closest('section')).toHaveClass('@container')
+    const [link] = await within(list).findAllByRole('link')
+    expect(link).toHaveClass('@lg:flex-nowrap')
+    expect(link).not.toHaveClass('sm:flex-nowrap')
   })
 
   it('shows the status when a report is not complete', async () => {

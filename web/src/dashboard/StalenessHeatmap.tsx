@@ -78,7 +78,7 @@ function HeatmapGrid({ lb, metric, categories, active, onActive, describedBy }: 
                 }
               : { backgroundColor: `color-mix(in oklab, ${color} ${Math.round(rate(counts, metric) * MAX_MIX)}%, var(--surface-3))` }
           }
-          className="px-3 py-2 text-center font-mono tabular-nums data-[active=true]:ring-2 data-[active=true]:ring-[var(--accent)] data-[active=true]:ring-inset data-[crosshair=true]:brightness-125"
+          className="px-3 py-2 text-center font-mono tabular-nums data-[active=true]:ring-2 data-[active=true]:ring-[var(--text)] data-[active=true]:ring-inset data-[crosshair=true]:brightness-125"
           onPointerEnter={() => onActive({ rowKey, category, sentence })}
           onPointerLeave={() => onActive(null)}
           onFocus={() => onActive({ rowKey, category, sentence })}
