@@ -97,7 +97,26 @@ func (c *Client) Complete(ctx context.Context, req Request) (string, error) {
 // CompleteJSON sends req, decodes the reply into out and validates it. An
 // unusable reply gets one repair request; a second failure returns an error
 // wrapping ErrMalformed. HTTP errors are returned without a repair attempt.
+//
+// When the primary model fails in any way (an HTTP error, its own deadline, or
+// an unusable reply) and req names fallbacks, the first fallback gets one try
+// with a fresh deadline. Bifrost's own fallbacks run only on a provider error,
+// and the plugin's deadline cancels the whole request, so a slow or rejected
+// primary would otherwise never reach them. A caller that gave up gets no retry.
 func (c *Client) CompleteJSON(ctx context.Context, req Request, out any) error {
+	err := c.completeJSON(ctx, req, out)
+	if err == nil || len(req.Fallbacks) == 0 || ctx.Err() != nil {
+		return err
+	}
+	next := req
+	next.Model, next.Fallbacks = req.Fallbacks[0], req.Fallbacks[1:]
+	if fallbackErr := c.completeJSON(ctx, next, out); fallbackErr != nil {
+		return fmt.Errorf("%w (after %s failed: %v)", fallbackErr, req.Model, err)
+	}
+	return nil
+}
+
+func (c *Client) completeJSON(ctx context.Context, req Request, out any) error {
 	messages := initialMessages(req)
 	content, err := c.send(ctx, req, messages)
 	if err != nil {
