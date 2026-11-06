@@ -108,8 +108,33 @@ describe('ChatPage', () => {
     await userEvent.click(screen.getByRole('radio', { name: 'Before reply' }))
     await send()
     expect(chatBody(fake)).toMatchObject({ mode: 'sync', policy: 'heal', stream: false })
-    expect(await screen.findByRole('switch', { name: 'Show corrected answer' })).toBeChecked()
+    const version = await screen.findByRole('radiogroup', { name: 'Answer version' })
+    expect(within(version).getByRole('radio', { name: 'Corrected' })).toHaveAttribute('aria-checked', 'true')
     expect((await screen.findAllByText('$25', { selector: 'ins' })).length).toBeGreaterThan(0)
+    await userEvent.click(within(version).getByRole('radio', { name: 'Original' }))
+    expect(document.querySelectorAll('ins')).toHaveLength(0)
+  })
+
+  it('summarises the verdicts in the message header', async () => {
+    fake = setup(streamedAnswer, completeReport())
+    await send()
+    expect(await screen.findByText(`Freshness ${completeReport().score} of 100`, {}, { timeout: 3000 })).toBeInTheDocument()
+    expect(screen.getByText('1 outdated')).toBeInTheDocument()
+    expect(screen.getByText('1 current')).toBeInTheDocument()
+  })
+
+  it('shows no summary chips when the answer has no claims', async () => {
+    fake = setup(streamedAnswer, completeReport({ claims: [], total_claims: 0, checked_count: 0, stale_count: 0 }))
+    await send()
+    // The sentence appears in the message header and in the page's live region.
+    await screen.findAllByText('No time-sensitive claims were found in this answer.', {}, { timeout: 3000 })
+    expect(screen.queryByText(/^\d+ (incorrect|outdated|could not be verified|current|not checked|being checked)$/)).toBeNull()
+  })
+
+  it('ends the checking loader with an error when the check fails', async () => {
+    fake = setup(streamedAnswer, completeReport({ status: 'error', reason: 'The judge model did not respond.' }))
+    await send()
+    expect((await screen.findAllByText('The claims could not be checked.', {}, { timeout: 3000 })).length).toBeGreaterThan(0)
   })
 
   it('explains a blocked answer and links its report', async () => {

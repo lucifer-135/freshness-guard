@@ -1,16 +1,29 @@
-import { useEffect, useId, useState } from 'react'
+import { motion } from 'motion/react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { splitModel } from './models'
 import type { AssistantMessage, Message } from './useChat'
 import { ClaimText } from '@/claims/ClaimText'
 import { progressSentence } from '@/claims/progress'
 import { ScoreRing } from '@/claims/ScoreRing'
+import { STATUS_META } from '@/claims/status'
+import { summaryChips } from '@/claims/summary'
 import { useStaggeredClaims } from '@/claims/useStaggeredClaims'
-import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
+import LatticeLoader from '@/components/reactbits/LatticeLoader'
+import { Segmented } from '@/components/Segmented'
 import { correctedView, hasChanges } from '@/heal/corrections'
 import { HealDiff } from '@/heal/HealDiff'
 import { useReport } from '@/live/useReport'
+import { useReducedMotion } from '@/motion/useReducedMotion'
+
+const versionOptions = [
+  { value: 'original', label: 'Original' },
+  { value: 'corrected', label: 'Corrected' },
+]
+
+function statusColour(status: string): string {
+  return `var(--status-${status === 'pending' ? 'unchecked' : status})`
+}
 
 interface MessageViewProps {
   message: Message
@@ -35,9 +48,11 @@ function AnswerView({ message, syncTimeoutMs, openClaimId, onOpenChange, onStatu
   const checked = message.mode !== 'off' && message.phase === 'done' && message.reportId !== null
   const report = useReport(message.reportId, { enabled: checked })
   const staggered = useStaggeredClaims(report.data?.claims ?? [], report.data?.status ?? 'pending')
-  const switchId = useId()
+  const reduce = useReducedMotion()
   const changes = report.data ? correctedView(report.data) : []
   const [showCorrected, setShowCorrected] = useState<boolean | null>(null)
+  // The answer fades between versions only after the reader switches; a message that is first shown does not animate.
+  const [switched, setSwitched] = useState(false)
   const corrected = (showCorrected ?? (message.headers?.healed ?? 0) > 0) && hasChanges(changes)
 
   const revealed = staggered.claims.filter((c) => c.checked && c.verdict !== 'NOT_CHECKED').length
@@ -50,20 +65,61 @@ function AnswerView({ message, syncTimeoutMs, openClaimId, onOpenChange, onStatu
 
   const { provider, name } = splitModel(message.model)
   const notFound = report.error?.status === 404
+  const chips = report.data ? summaryChips(staggered.claims, staggered.reportStatus) : []
 
   return (
     <article className="space-y-3 rounded-xl border border-border bg-surface-1 p-4 shadow-[var(--highlight-top)]">
       <header className="flex flex-wrap items-center gap-3">
         {report.data && <ScoreRing score={staggered.reportStatus === 'complete' ? report.data.score : null} />}
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
+          {report.data && staggered.reportStatus === 'complete' && <p className="font-medium">Freshness {report.data.score} of 100</p>}
           <p className="font-mono text-xs text-text-subtle">
             {provider && `${provider} / `}
             {name}
             {message.elapsedMs !== null && ` · Answered in ${(message.elapsedMs / 1000).toFixed(1)} s`}
           </p>
-          {sentence && <p className="text-sm text-text-muted">{sentence}</p>}
+          {sentence && staggered.reportStatus === 'pending' && (
+            // The page's live region announces the same sentence, so the loader is hidden from screen readers.
+            <div aria-hidden="true" className="mt-1 text-text-muted">
+              <LatticeLoader label={sentence} color="var(--text-muted)" fontSize={13} />
+            </div>
+          )}
+          {sentence && staggered.reportStatus !== 'pending' && <p className="text-sm text-text-muted">{sentence}</p>}
+          {staggered.reportStatus === 'error' && (
+            <div aria-hidden="true" className="mt-1 text-text-muted">
+              <LatticeLoader status="error" label={sentence ?? ''} errorLabel="The claims could not be checked." showTimer={false} color="var(--text-muted)" fontSize={13} />
+            </div>
+          )}
         </div>
+        {hasChanges(changes) && (
+          <Segmented
+            label="Answer version"
+            value={corrected ? 'corrected' : 'original'}
+            options={versionOptions}
+            onChange={(version) => {
+              setSwitched(true)
+              setShowCorrected(version === 'corrected')
+            }}
+          />
+        )}
       </header>
+      {chips.length > 0 && (
+        <ul aria-label="Verdict summary" className="flex flex-wrap gap-2">
+          {chips.map(({ status, label }) => {
+            const Icon = STATUS_META[status].icon
+            return (
+              <li
+                key={status}
+                className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs"
+                style={{ borderColor: `color-mix(in oklab, ${statusColour(status)} 50%, transparent)` }}
+              >
+                <Icon aria-hidden="true" className="size-3.5" style={{ color: statusColour(status) }} />
+                {label}
+              </li>
+            )
+          })}
+        </ul>
+      )}
 
       {message.phase === 'streaming' &&
         (message.text ? (
@@ -93,28 +149,29 @@ function AnswerView({ message, syncTimeoutMs, openClaimId, onOpenChange, onStatu
 
       {message.phase === 'done' && (
         <>
-          {report.data?.answer_text ? (
-            corrected ? (
-              <HealDiff report={report.data} segments={changes} showCorrected />
+          <motion.div
+            key={corrected ? 'corrected' : 'original'}
+            initial={switched ? (reduce ? { opacity: 0 } : { opacity: 0, filter: 'blur(2px)' }) : false}
+            animate={reduce ? { opacity: 1 } : { opacity: 1, filter: 'blur(0px)' }}
+            transition={{ duration: reduce ? 0.08 : 0.2, ease: [0.23, 1, 0.32, 1] }}
+          >
+            {report.data?.answer_text ? (
+              corrected ? (
+                <HealDiff report={report.data} segments={changes} showCorrected />
+              ) : (
+                <ClaimText
+                  text={report.data.answer_text}
+                  claims={staggered.claims}
+                  reportStatus={staggered.reportStatus}
+                  report={report.data}
+                  openClaimId={openClaimId}
+                  onOpenChange={onOpenChange}
+                />
+              )
             ) : (
-              <ClaimText
-                text={report.data.answer_text}
-                claims={staggered.claims}
-                reportStatus={staggered.reportStatus}
-                report={report.data}
-                openClaimId={openClaimId}
-                onOpenChange={onOpenChange}
-              />
-            )
-          ) : (
-            <p className="text-base leading-relaxed whitespace-pre-wrap">{message.text}</p>
-          )}
-          {hasChanges(changes) && (
-            <div className="flex items-center gap-2">
-              <Switch id={switchId} checked={corrected} onCheckedChange={setShowCorrected} />
-              <Label htmlFor={switchId}>Show corrected answer</Label>
-            </div>
-          )}
+              <p className="text-base leading-relaxed whitespace-pre-wrap">{message.text}</p>
+            )}
+          </motion.div>
           {message.mode === 'off' && <Note>Freshness checking was off for this answer.</Note>}
           {message.mode === 'sync' && message.headers?.status === 'pending' && (
             <Note>{`Verification is taking longer than ${Math.round(syncTimeoutMs / 1000)} seconds. The answer is shown now, and the results will appear when they are ready.`}</Note>
