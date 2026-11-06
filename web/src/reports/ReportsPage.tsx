@@ -2,14 +2,14 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import { listReports, type ApiError } from '@/api/client'
 import type { Report, ReportStatus } from '@/api/types'
-import { formatDateTime } from '@/claims/format'
+import { formatDateTime, formatShortDateTime } from '@/claims/format'
 import { ScoreFigure } from '@/claims/ScoreRing'
 import { modeLabel } from '@/chat/modes'
 
 const statusLabel: Record<ReportStatus, string> = { pending: 'Checking', complete: 'Complete', error: 'Failed' }
 
 // Mode and status are details; on a phone the time, model and figures come first.
-const narrowHidden = new Set(['Mode', 'Status'])
+const narrowHidden = new Set(['Model', 'Mode', 'Status', 'Checked'])
 
 export function ReportsPage() {
   const reports = useQuery<Report[], ApiError>({ queryKey: ['reports'], queryFn: () => listReports({ limit: 50 }) })
@@ -43,17 +43,18 @@ export function ReportsPage() {
                 <tr key={r.id} className="relative border-t border-border hover:bg-surface-1">
                   <td className="px-3 py-2">
                     <Link to={`/reports/${r.id}`} className="font-medium text-text after:absolute after:inset-0 hover:text-link-strong">
-                      {formatDateTime(r.created_at) || r.id}
+                      <span className="whitespace-nowrap sm:hidden">{formatShortDateTime(r.created_at) || r.id}</span>
+                      <span className="hidden sm:inline">{formatDateTime(r.created_at) || r.id}</span>
                     </Link>
                   </td>
-                  <td className="px-3 py-2 font-mono text-xs">{r.model || 'Pasted text'}</td>
+                  <td className="hidden px-3 py-2 font-mono text-xs sm:table-cell">{r.model || 'Pasted text'}</td>
                   <td className="hidden px-3 py-2 sm:table-cell">{modeLabel(r.mode)}</td>
                   <td className="hidden px-3 py-2 sm:table-cell">{statusLabel[r.status]}</td>
                   <td className="px-3 py-2">
                     <ScoreFigure score={r.score} />
                   </td>
                   <td className="px-3 py-2 font-mono tabular-nums">{r.stale_count}</td>
-                  <td className="px-3 py-2 font-mono tabular-nums">
+                  <td className="hidden px-3 py-2 font-mono tabular-nums sm:table-cell">
                     {r.checked_count} of {r.total_claims}
                   </td>
                 </tr>

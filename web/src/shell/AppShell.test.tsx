@@ -50,9 +50,11 @@ describe('AppShell', () => {
     }
   })
 
-  it('draws no ambient background', () => {
+  // The developer asked on 7 November 2026 for a ground that answers the mouse; it is CSS, not a canvas.
+  it('draws the pointer field behind the content, without a canvas', () => {
     fake = fakeFetch({ 'GET /freshness/status': () => status(true, 9), 'GET /freshness/events': endedStream })
     renderAt('/chat')
+    expect(document.querySelector('[data-pointer-field]')).not.toBeNull()
     expect(document.querySelector('canvas')).toBeNull()
   })
 

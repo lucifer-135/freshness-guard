@@ -159,6 +159,28 @@
 }
 
 @layer components {
+  /* The page ground (PointerField): a faint dot grid, brighter in a soft circle
+     around the mouse. Neutral only, because saturated colour means a verdict. */
+  .pointer-field {
+    background-image: radial-gradient(circle, color-mix(in oklab, var(--text) 9%, transparent) 1px, transparent 1.5px);
+    background-size: 24px 24px;
+  }
+
+  .pointer-field::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle, color-mix(in oklab, var(--text) 38%, transparent) 1.2px, transparent 1.8px);
+    background-size: 24px 24px;
+    mask-image: radial-gradient(240px circle at var(--mx, -999px) var(--my, -999px), black, transparent 72%);
+    opacity: 0;
+    transition: opacity var(--dur-enter) var(--ease-enter);
+  }
+
+  .pointer-field[data-active]::after {
+    opacity: 1;
+  }
+
   /* Claim underlines (DESIGN.md section 3.3): colour is never the only signal. */
   .claim-current,
   .claim-unverified,

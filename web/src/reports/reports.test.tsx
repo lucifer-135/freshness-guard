@@ -49,6 +49,8 @@ describe('ReportsPage', () => {
     expect(within(row).getByLabelText(/^Freshness score \d+ out of 100$/)).toHaveClass('font-mono')
     // Mode and status give way to the figures on narrow screens.
     expect(screen.getByRole('columnheader', { name: 'Mode' })).toHaveClass('hidden', 'sm:table-cell')
+    for (const name of ['Model', 'Checked']) expect(screen.getByRole('columnheader', { name })).toHaveClass('hidden', 'sm:table-cell')
+    expect(link.querySelector('[class~="sm:hidden"]')).not.toBeNull()
   })
 
   it('explains an empty list', async () => {

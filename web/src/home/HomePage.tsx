@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Logo } from '@/brand/Logo'
+import { PointerField } from '@/shell/PointerField'
 import { ScanAnswer } from './ScanAnswer'
 
 const repository = 'https://github.com/lucifer-135/freshness-guard'
@@ -17,7 +18,8 @@ interface HomePageProps {
 // that opens the chat. It makes no API call until the form is sent.
 export function HomePage({ notice, onConnect }: HomePageProps) {
   return (
-    <div className="min-h-dvh bg-bg text-text">
+    <div className="relative isolate min-h-dvh text-text">
+      <PointerField />
       <header className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-6 gap-y-2 px-6 py-4 lg:px-12">
         <p>
           <Logo />

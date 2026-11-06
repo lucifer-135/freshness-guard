@@ -45,6 +45,7 @@ describe('TokenGate', () => {
     expect(screen.getByText(/not yet independently reviewed/)).toBeInTheDocument()
     expect(screen.getByText('x-bf-freshness: async | sync | off')).toBeInTheDocument()
     expect(fake.requests).toHaveLength(0)
+    expect(document.querySelector('[data-pointer-field]')).not.toBeNull()
   })
 
   it('lets the reader move the scan line across the example answer with the keyboard', async () => {

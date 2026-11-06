@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Outlet, useLocation } from 'react-router'
 import { ChatProvider } from '@/chat/ChatProvider'
+import { PointerField } from './PointerField'
 import { TopBar } from './TopBar'
 
 export function AppShell() {
@@ -19,6 +20,7 @@ export function AppShell() {
 
   return (
     <div className="relative isolate flex min-h-dvh flex-col text-text">
+      <PointerField />
       <a
         href="#main"
         className="sr-only z-[100] rounded-md bg-surface-3 px-3 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2"

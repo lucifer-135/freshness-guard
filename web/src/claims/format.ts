@@ -18,3 +18,11 @@ export function formatDateTime(value: string): string {
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? '' : `${localDate.format(date)}, ${localTime.format(date)}`
 }
+
+const shortDate = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' })
+
+// formatShortDateTime writes a time in the reader's time zone as "6 Nov, 19:48", for narrow tables.
+export function formatShortDateTime(value: string): string {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '' : `${shortDate.format(date)}, ${localTime.format(date)}`
+}
