@@ -38,7 +38,7 @@ export function ClaimInspector({ report, selectedId, onSelect }: ClaimInspectorP
               onClick={() => onSelect(c.id)}
               disabled={unplaced.has(c.id)}
               aria-expanded={selected}
-              className="flex w-full items-start gap-3 p-3 text-left transition-colors duration-[var(--dur-hover)] hover:bg-surface-1 aria-expanded:bg-surface-1 aria-expanded:shadow-[inset_2px_0_0_var(--accent)] disabled:cursor-default"
+              className="flex w-full items-start gap-3 p-3 text-left transition-colors duration-[var(--dur-hover)] focus-visible:outline-offset-[-4px] enabled:hover:bg-surface-2 aria-expanded:bg-accent-soft aria-expanded:shadow-[inset_2px_0_0_var(--accent)] disabled:cursor-default"
             >
               {status === 'pending' ? (
                 <span aria-hidden="true" className="inline-flex size-7 shrink-0 items-center justify-center">

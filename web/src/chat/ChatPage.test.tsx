@@ -313,6 +313,20 @@ describe('ChatPage', () => {
     for (const row of within(inspector).getAllByRole('button')) expect(row).not.toHaveClass('bg-surface-2')
   })
 
+  it('keeps the inspector row focus ring inside the clipped list and marks hover and selection visibly', async () => {
+    fake = setup(streamedAnswer, completeReport())
+    await send()
+    await screen.findByText('2 claims checked. 1 claim is outdated.', {}, { timeout: 3000 })
+    const inspector = screen.getByRole('complementary', { name: 'Claims in this answer' })
+    for (const row of within(inspector).getAllByRole('button')) {
+      // The list clips its children for the rounded corners, so the ring sits inside the row.
+      expect(row).toHaveClass('focus-visible:outline-offset-[-4px]')
+      // surface-1 is about 1.07:1 against the page background, so it would not show.
+      expect(row).toHaveClass('enabled:hover:bg-surface-2', 'aria-expanded:bg-accent-soft')
+      expect(row).not.toHaveClass('hover:bg-surface-1')
+    }
+  })
+
   it('collapses an expanded claim when its row is chosen again', async () => {
     setScreenWide(true)
     fake = setup(streamedAnswer, completeReport())
