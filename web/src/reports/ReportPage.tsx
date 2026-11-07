@@ -41,6 +41,8 @@ export function ReportPage() {
         <div>
           <h1 className="text-2xl font-semibold">Freshness report</h1>
           <p className="text-text-muted">{progressSentence(r, checkedClaims)}</p>
+          {/* The sentence above is plain words; operators also get the pipeline's own reason. */}
+          {r.status === 'error' && r.reason && <p className="mt-1 font-mono text-xs text-text-subtle [overflow-wrap:anywhere]">{r.reason}</p>}
         </div>
       </header>
 

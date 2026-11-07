@@ -13,12 +13,34 @@ function withPeriod(text: string): string {
   return /[.!?]$/.test(text) ? text : `${text}.`
 }
 
+const stages: [prefix: string, words: string][] = [
+  ['Claim extraction failed', 'Finding the claims failed'],
+  ['Verification failed', 'Checking the claims failed'],
+]
+
+const causes: [pattern: RegExp, words: string][] = [
+  [/deadline exceeded|timed? ?out/i, 'a model did not answer in time.'],
+  [/HTTP 429|rate.?limit/i, 'a model provider is limiting requests. Try again in a minute.'],
+  [/connection refused|no such host|dial tcp/i, 'Bifrost could not be reached.'],
+  [/json_validate_failed|HTTP 400|malformed|could not be used/i, 'a model returned a reply that could not be read.'],
+]
+
+// plainReason turns the pipeline's reason, which is written for the log, into
+// the stage that failed and its cause in plain words. A reason it does not
+// recognise is kept as it is; the report page still shows the raw text.
+export function plainReason(reason: string): string {
+  const stage = stages.find(([prefix]) => reason.startsWith(prefix))
+  const cause = causes.find(([pattern]) => pattern.test(reason))
+  if (!stage || !cause) return withPeriod(reason)
+  return `${stage[1]} because ${cause[1]}`
+}
+
 // progressSentence describes a report's state in one or two complete
 // sentences, for the status line and the live region. revealed is the number
 // of checked claims whose verdict is shown so far.
 export function progressSentence(report: Report, revealed: number): string {
   if (report.status === 'error') {
-    return report.reason ? `The freshness check could not finish. ${withPeriod(report.reason)}` : 'The freshness check could not finish.'
+    return report.reason ? `The freshness check could not finish. ${plainReason(report.reason)}` : 'The freshness check could not finish.'
   }
   const checked = report.claims.filter((c) => c.checked).length
   if (report.status === 'pending') {

@@ -112,6 +112,15 @@ describe('ReportPage', () => {
     expect(await screen.findByText('No claims needed correction.')).toBeInTheDocument()
   })
 
+  it('explains a failed check in plain words and keeps the raw reason for operators', async () => {
+    const reason = 'Verification failed: judge: call groq/openai/gpt-oss-120b: context deadline exceeded'
+    fake = renderAt('/reports/r1', { 'GET /freshness/reports/r1': () => json(200, completeReport({ status: 'error', reason })) })
+    expect(
+      await screen.findByText('The freshness check could not finish. Checking the claims failed because a model did not answer in time.'),
+    ).toBeInTheDocument()
+    expect(screen.getByText(reason)).toHaveClass('font-mono')
+  })
+
   it('says when the report does not exist', async () => {
     fake = renderAt('/reports/gone', { 'GET /freshness/reports/gone': () => json(404, { error: 'The report was not found.' }) })
     expect(await screen.findByText('The report was not found.')).toBeInTheDocument()

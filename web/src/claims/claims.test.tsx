@@ -114,8 +114,27 @@ describe('progressSentence', () => {
       'No claims were checked because none of them is likely to change over time.',
     )
     expect(progressSentence(report('error', [], { reason: 'Claim extraction failed: timeout' }), 0)).toBe(
-      'The freshness check could not finish. Claim extraction failed: timeout.',
+      'The freshness check could not finish. Finding the claims failed because a model did not answer in time.',
     )
+  })
+
+  // The pipeline's reasons are written for logs; the reader gets the stage and the cause in plain words.
+  it('explains a failed check in plain words instead of the raw error', () => {
+    const failed = (reason: string) => progressSentence(report('error', [], { reason }), 0)
+    expect(
+      failed('Verification failed: judge: call groq/openai/gpt-oss-120b: Post "http://127.0.0.1:8080/v1/chat/completions": context deadline exceeded'),
+    ).toBe('The freshness check could not finish. Checking the claims failed because a model did not answer in time.')
+    expect(failed('Claim extraction failed: model groq/openai/gpt-oss-20b returned HTTP 400: {"error":{"code":"json_validate_failed"}}')).toBe(
+      'The freshness check could not finish. Finding the claims failed because a model returned a reply that could not be read.',
+    )
+    expect(failed('Verification failed: judge: model groq/a returned HTTP 429: rate limit')).toBe(
+      'The freshness check could not finish. Checking the claims failed because a model provider is limiting requests. Try again in a minute.',
+    )
+    expect(failed('Claim extraction failed: call groq/a: Post "http://127.0.0.1:8080": dial tcp 127.0.0.1:8080: connect: connection refused')).toBe(
+      'The freshness check could not finish. Finding the claims failed because Bifrost could not be reached.',
+    )
+    // A reason that is already a plain sentence is kept as it is.
+    expect(failed('The judge model did not respond.')).toBe('The freshness check could not finish. The judge model did not respond.')
   })
 })
 
