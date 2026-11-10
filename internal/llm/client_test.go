@@ -211,17 +211,34 @@ func TestInternalCallsBypassSemanticCache(t *testing.T) {
 }
 
 // modelServer answers per model: slow models wait, failing models return an HTTP error.
-func modelServer(t *testing.T, slow map[string]time.Duration, failing map[string]int, seen *[]string) *httptest.Server {
-	var mu sync.Mutex
+// seenModels records each request's model and fallbacks. The handler writes
+// from the server's goroutine, so reads take the same lock: a test whose client
+// gave up can read while the slow handler is still running.
+type seenModels struct {
+	mu   sync.Mutex
+	list []string
+}
+
+func (s *seenModels) add(entry string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.list = append(s.list, entry)
+}
+
+func (s *seenModels) all() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.list...)
+}
+
+func modelServer(t *testing.T, slow map[string]time.Duration, failing map[string]int, seen *seenModels) *httptest.Server {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			Model     string   `json:"model"`
 			Fallbacks []string `json:"fallbacks"`
 		}
 		_ = json.NewDecoder(r.Body).Decode(&body)
-		mu.Lock()
-		*seen = append(*seen, body.Model+"|"+strings.Join(body.Fallbacks, ","))
-		mu.Unlock()
+		seen.add(body.Model + "|" + strings.Join(body.Fallbacks, ","))
 		if d := slow[body.Model]; d > 0 {
 			select {
 			case <-time.After(d):
@@ -245,17 +262,17 @@ func modelServer(t *testing.T, slow map[string]time.Duration, failing map[string
 // Bifrost only falls back on a provider error, and the plugin's deadline cancels the
 // whole request, so a slow or rejected primary must hand over to the fallback here.
 func TestCompleteJSONFallsBackWhenThePrimaryIsRejected(t *testing.T) {
-	var seen []string
+	var seen seenModels
 	srv := modelServer(t, nil, map[string]int{"groq/a": http.StatusBadRequest}, &seen)
 	var o out
 	err := llm.New(srv.URL, "").CompleteJSON(context.Background(), llm.Request{Model: "groq/a", Fallbacks: []string{"gemini/b", "gemini/c"}}, &o)
 	require.NoError(t, err)
 	assert.Equal(t, 7, o.A)
-	assert.Equal(t, []string{"groq/a|gemini/b,gemini/c", "gemini/b|gemini/c"}, seen)
+	assert.Equal(t, []string{"groq/a|gemini/b,gemini/c", "gemini/b|gemini/c"}, seen.all())
 }
 
 func TestCompleteJSONFallsBackWhenThePrimaryTimesOut(t *testing.T) {
-	var seen []string
+	var seen seenModels
 	srv := modelServer(t, map[string]time.Duration{"groq/a": time.Second}, nil, &seen)
 	var o out
 	start := time.Now()
@@ -267,18 +284,18 @@ func TestCompleteJSONFallsBackWhenThePrimaryTimesOut(t *testing.T) {
 }
 
 func TestCompleteJSONDoesNotFallBackWhenTheCallerGaveUp(t *testing.T) {
-	var seen []string
+	var seen seenModels
 	srv := modelServer(t, map[string]time.Duration{"groq/a": time.Second}, nil, &seen)
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 	var o out
 	err := llm.New(srv.URL, "").CompleteJSON(ctx, llm.Request{Model: "groq/a", Fallbacks: []string{"gemini/b"}}, &o)
 	require.Error(t, err)
-	assert.Len(t, seen, 1)
+	assert.Len(t, seen.all(), 1)
 }
 
 func TestCompleteJSONReportsBothFailures(t *testing.T) {
-	var seen []string
+	var seen seenModels
 	srv := modelServer(t, nil, map[string]int{"groq/a": http.StatusBadRequest, "gemini/b": http.StatusTooManyRequests}, &seen)
 	var o out
 	err := llm.New(srv.URL, "").CompleteJSON(context.Background(), llm.Request{Model: "groq/a", Fallbacks: []string{"gemini/b"}}, &o)
