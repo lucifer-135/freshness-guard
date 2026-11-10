@@ -77,7 +77,7 @@ export function Composer({ busy, onSend }: ComposerProps) {
         rows={2}
         placeholder="Ask about something that changes over time"
         // The form is the one container; the field inside it draws no second border.
-        className="border-0 bg-transparent px-1 shadow-none dark:bg-transparent"
+        className="border-0 bg-transparent px-1 shadow-none"
       />
       <div className="flex flex-wrap items-center gap-2">
         <Label htmlFor={`${messageId}-model`} className="sr-only">

@@ -61,6 +61,12 @@ describe('Segmented', () => {
     expect(label).toHaveClass('text-text-muted', 'peer-checked:text-text')
   })
 
+  it('raises the chosen option as a white segment on a grey track, as light interfaces do', () => {
+    render(<Segmented label="Verification mode" value="async" options={options} onChange={() => {}} />)
+    expect(screen.getByRole('radiogroup')).toHaveClass('bg-surface-2')
+    expect(screen.getByText('Off')).toHaveClass('peer-checked:bg-bg', 'peer-checked:shadow-[var(--shadow-raised)]')
+  })
+
   it('moves to the next option with the right arrow key', async () => {
     const onChange = vi.fn()
     render(<Segmented label="Verification mode" value="async" options={options} onChange={onChange} />)

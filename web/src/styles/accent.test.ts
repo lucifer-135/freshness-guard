@@ -67,3 +67,26 @@ test('segmented labels in the primary text colour keep 4.5:1 contrast at 70% opa
   const label = blend(tokens['--text'], tokens['--surface-1'], 0.7)
   expect(contrast(label, tokens['--surface-1'])).toBeGreaterThanOrEqual(4.5)
 })
+
+// One light theme (10 November 2026): every text colour stays readable on every
+// surface it can sit on, and the status colours are also used as text.
+test('text colours keep 4.5:1 contrast on every surface', () => {
+  for (const fg of ['--text', '--text-muted', '--text-subtle']) {
+    for (const bg of ['--bg', '--surface-1', '--surface-2', '--surface-3']) {
+      expect(contrast(tokens[fg], tokens[bg]), `${fg} on ${bg}`).toBeGreaterThanOrEqual(4.5)
+    }
+  }
+})
+
+test('status colours used as text keep 4.5:1 contrast on the page and on surface 1', () => {
+  for (const fg of ['--status-current', '--status-unverified', '--status-outdated', '--status-incorrect', '--accent']) {
+    for (const bg of ['--bg', '--surface-1']) {
+      expect(contrast(tokens[fg], tokens[bg]), `${fg} on ${bg}`).toBeGreaterThanOrEqual(4.5)
+    }
+  }
+})
+
+test('the page background is light', () => {
+  expect(luminance(tokens['--bg'])).toBeGreaterThan(0.9)
+  expect(luminance(tokens['--text'])).toBeLessThan(0.05)
+})

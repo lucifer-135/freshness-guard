@@ -13,7 +13,7 @@ interface SegmentedProps<T extends string> {
 export function Segmented<T extends string>({ label, value, options, onChange }: SegmentedProps<T>) {
   const name = useId()
   return (
-    <div role="radiogroup" aria-label={label} className="inline-flex rounded-md border border-border bg-surface-1 p-0.5">
+    <div role="radiogroup" aria-label={label} className="inline-flex rounded-md border border-border bg-surface-2 p-0.5">
       {options.map((option) => (
         <label key={option.value} className="relative">
           <input
@@ -24,7 +24,7 @@ export function Segmented<T extends string>({ label, value, options, onChange }:
             onChange={() => onChange(option.value)}
             className="peer absolute inset-0 cursor-pointer appearance-none rounded-[5px]"
           />
-          <span className="pointer-events-none block rounded-[5px] px-3 py-1 text-sm whitespace-nowrap text-text-muted transition-colors duration-[var(--dur-hover)] peer-hover:text-text peer-checked:bg-surface-3 peer-checked:text-text peer-checked:shadow-[var(--highlight-top)]">
+          <span className="pointer-events-none block rounded-[5px] px-3 py-1 text-sm whitespace-nowrap text-text-muted transition-colors duration-[var(--dur-hover)] peer-hover:text-text peer-checked:bg-bg peer-checked:text-text peer-checked:shadow-[var(--shadow-raised)]">
             {option.label}
           </span>
         </label>

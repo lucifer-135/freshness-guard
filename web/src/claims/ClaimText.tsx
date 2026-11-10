@@ -131,7 +131,7 @@ export function ClaimText({ text, claims, reportStatus, report, openClaimId, onO
             <Popover key={i} open={open} onOpenChange={(next) => !next && close(id)}>
               <PopoverAnchor asChild>{span}</PopoverAnchor>
               <PopoverContent
-                className={`max-h-[70vh] max-w-[calc(100vw-2rem)] overflow-y-auto bg-surface-3 shadow-[var(--shadow-float)] ${renderCard ? 'w-auto' : 'w-96'}`}
+                className={`max-h-[70vh] max-w-[calc(100vw-2rem)] overflow-y-auto shadow-[var(--shadow-float)] ${renderCard ? 'w-auto' : 'w-96'}`}
                 // A card opened by hovering must not take focus from the reader.
                 onOpenAutoFocus={(e) => pinned !== id && e.preventDefault()}
                 onCloseAutoFocus={(e) => e.preventDefault()}
