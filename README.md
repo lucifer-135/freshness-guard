@@ -262,13 +262,13 @@ Targets from the design specification, next to what was measured:
 
 Not measured: FreshQA, and ablations of triage and of fresh-context injection.
 
-Tests, run on 6 November 2026:
+Tests, run on 10 November 2026:
 
 | Suite | Result |
 |---|---|
-| Go unit tests (`go test ./...` in Docker) | 345 tests pass |
+| Go unit tests (`go test ./...` in Docker) | 351 tests pass (394 with subtests) |
 | End-to-end tests against Bifrost with the plugin and fake providers | 20 of 20 pass |
-| Web unit tests (Vitest) | 180 of 180 pass |
+| Web unit tests (Vitest) | 268 of 268 pass |
 | Browser tests with an accessibility scan (Playwright and axe) | 7 of 7 pass |
 
 To reproduce the curated run, follow [bench/README.md](bench/README.md). The overhead run is `freshbench overhead` against the end-to-end stack.
