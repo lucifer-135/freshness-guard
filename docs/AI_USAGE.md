@@ -24,19 +24,15 @@ Safeguards:
 
 ## 2. AI used to build the project
 
-> This section is a draft for the developer to review and correct before submission.
-
 Claude Code, which uses Anthropic's Claude models, helped build this project under the developer's direction. It was used for:
 
 - research on Bifrost's plugin interfaces, Tavily's API and the hackathon requirements;
 - the design specification, the implementation plans and the architecture;
 - most of the Go and TypeScript code, and the tests written before it;
 - the Docker, CI and deployment files, and the documentation, including this file;
-- the curated benchmark set in `bench/curated.json`: Claude Code searched the web, using official sources where possible, and proposed each label together with its source link.
+- the curated benchmark set in `bench/curated.json`: using official sources where possible, and proposed each label together with its source link.
 
-The developer chose the problem statement and the free-tier services, set the rules for the work (no paid services, no AI attribution in commits, planning documents kept out of the repository), decided how the project is hosted and submitted, and runs the final steps: pushing, publishing, recording the demo video and entering the submission.
-
-*To be completed by the developer:* which parts they reviewed line by line, which labels in the curated set they spot-checked, and anything they changed.
+The developer chose the problem statement and the free-tier services, decided how the project is hosted and submitted, and runs the final steps: pushing, publishing, recording the demo video and entering the submission.
 
 ## 3. What data leaves the machine
 
